@@ -1,7 +1,9 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
-import { Toaster } from 'react-hot-toast'
+import Providers from '@/components/Providers'
+
+export const dynamic = 'force-dynamic'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -24,24 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className={`${inter.className} bg-dark text-white antialiased`}>
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            style: {
-              background: '#1A1A30',
-              color: '#fff',
-              border: '1px solid rgba(124,58,237,0.3)',
-              borderRadius: '12px',
-            },
-            success: {
-              iconTheme: { primary: '#8B5CF6', secondary: '#fff' },
-            },
-            error: {
-              iconTheme: { primary: '#ef4444', secondary: '#fff' },
-            },
-          }}
-        />
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   )
