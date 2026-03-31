@@ -1,0 +1,122 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
+import Link from 'next/link'
+import toast from 'react-hot-toast'
+import { Brain, LayoutDashboard, BookOpen, Award, LogOut, Menu, ChevronRight, UserCircle } from 'lucide-react'
+
+const navItems = [
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/dashboard/courses', label: 'My Courses', icon: BookOpen },
+  { href: '/dashboard/certificates', label: 'Certificates', icon: Award },
+  { href: '/dashboard/profile', label: 'My Profile', icon: UserCircle },
+]
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [user, setUser] = useState<{ name: string; phone: string } | null>(null)
+
+  // Auto-collapse sidebar on course detail pages
+  const isCourseDetail = /^\/dashboard\/courses\/[^/]+/.test(pathname)
+
+  useEffect(() => {
+    if (isCourseDetail) setSidebarOpen(false)
+  }, [isCourseDetail])
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.error) { router.push('/login'); return }
+        if (data.role === 'ADMIN') { router.push('/admin'); return }
+        setUser(data)
+      })
+  }, [])
+
+  async function handleLogout() {
+    await fetch('/api/auth/logout', { method: 'POST' })
+    toast.success('Logged out')
+    router.push('/login')
+  }
+
+  return (
+    <div className="min-h-screen bg-dark flex">
+      {sidebarOpen && (
+        <div className={`fixed inset-0 bg-black/50 z-20 ${!isCourseDetail ? 'lg:hidden' : ''}`} onClick={() => setSidebarOpen(false)} />
+      )}
+
+      <aside className={`fixed top-0 left-0 h-full w-64 bg-dark-200 border-r border-white/5 z-30 
+        transition-transform duration-300 flex flex-col
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${!isCourseDetail ? 'lg:translate-x-0' : ''}`}>
+        <div className="p-5 border-b border-white/5">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-600 to-cyan-500 flex items-center justify-center">
+              <Brain className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <div className="font-display font-bold text-sm gradient-text">AI·DS Academy</div>
+              <div className="text-xs text-white/30">Student Portal</div>
+            </div>
+          </div>
+        </div>
+
+        <nav className="p-4 flex-1 space-y-1">
+          {navItems.map((item) => {
+            const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200
+                  ${active
+                    ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                    : 'text-white/50 hover:text-white hover:bg-white/5'}`}
+              >
+                <item.icon className="w-4 h-4" />
+                {item.label}
+                {active && <ChevronRight className="w-3 h-3 ml-auto" />}
+              </Link>
+            )
+          })}
+        </nav>
+
+        <div className="p-4 border-t border-white/5">
+          {user && (
+            <div className="glass-card p-3 mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-purple-600 flex items-center justify-center text-xs font-bold">
+                  {user.name[0]}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate">{user.name}</div>
+                  <div className="badge-cyan text-xs px-2 py-0.5 mt-0.5">Student</div>
+                </div>
+              </div>
+            </div>
+          )}
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 w-full px-4 py-2.5 rounded-xl text-sm text-white/50 hover:text-red-400 hover:bg-red-500/10 transition-all"
+          >
+            <LogOut className="w-4 h-4" /> Sign Out
+          </button>
+        </div>
+      </aside>
+
+      <div className={`flex-1 ${!isCourseDetail ? 'lg:ml-64' : ''} flex flex-col min-h-screen`}>
+        <header className={`${!isCourseDetail ? 'lg:hidden' : ''} flex items-center justify-between px-4 py-3 border-b border-white/5 bg-dark-200 sticky top-0 z-10`}>
+          <button onClick={() => setSidebarOpen(true)} className="p-2 rounded-lg hover:bg-white/5">
+            <Menu className="w-5 h-5" />
+          </button>
+          <span className="font-display font-bold text-sm gradient-text">AI·DS Academy</span>
+          <div className="w-9" />
+        </header>
+        <main className="flex-1 p-6">{children}</main>
+      </div>
+    </div>
+  )
+}

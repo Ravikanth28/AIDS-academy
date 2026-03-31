@@ -1,0 +1,171 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String   @unique
+  email     String?
+  password  String?
+  role      Role     @default(STUDENT)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  otpSessions    OTPSession[]
+  enrollments    Enrollment[]
+  testAttempts   TestAttempt[]
+  certificates   Certificate[]
+}
+
+enum Role {
+  ADMIN
+  STUDENT
+}
+
+model OTPSession {
+  id        String   @id @default(cuid())
+  phone     String
+  otp       String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([phone])
+}
+
+model Course {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  thumbnail   String?
+  category    String?  @default("AI & Data Science")
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  modules      Module[]
+  enrollments  Enrollment[]
+  certificates Certificate[]
+}
+
+model Module {
+  id            String   @id @default(cuid())
+  title         String
+  description   String?
+  order         Int
+  courseId      String
+  course        Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  passingScore  Float    @default(60)
+  questionCount Int      @default(10)
+  createdAt     DateTime @default(now())
+
+  videos         Video[]
+  questions      Question[]
+  testAttempts   TestAttempt[]
+  moduleProgress ModuleProgress[]
+}
+
+model Video {
+  id          String   @id @default(cuid())
+  title       String
+  youtubeUrl  String
+  description String?
+  order       Int      @default(0)
+  moduleId    String
+  module      Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+}
+
+model Question {
+  id          String   @id @default(cuid())
+  text        String
+  moduleId    String
+  module      Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  explanation String?
+  createdAt   DateTime @default(now())
+
+  options     QuestionOption[]
+  testAnswers TestAnswer[]
+}
+
+model QuestionOption {
+  id         String   @id @default(cuid())
+  text       String
+  isCorrect  Boolean  @default(false)
+  order      Int      @default(0)
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+}
+
+model Enrollment {
+  id         String   @id @default(cuid())
+  userId     String
+  courseId   String
+  user       User     @relation(fields: [userId], references: [id])
+  course     Course   @relation(fields: [courseId], references: [id])
+  enrolledAt DateTime @default(now())
+
+  moduleProgress ModuleProgress[]
+
+  @@unique([userId, courseId])
+}
+
+model ModuleProgress {
+  id             String     @id @default(cuid())
+  enrollmentId   String
+  moduleId       String
+  enrollment     Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  module         Module     @relation(fields: [moduleId], references: [id])
+  videosWatched  String[]   @default([])
+  videoCompleted Boolean    @default(false)
+  testPassed     Boolean    @default(false)
+  testScore      Float?
+  completedAt    DateTime?
+
+  @@unique([enrollmentId, moduleId])
+}
+
+model TestAttempt {
+  id             String   @id @default(cuid())
+  userId         String
+  moduleId       String
+  user           User     @relation(fields: [userId], references: [id])
+  module         Module   @relation(fields: [moduleId], references: [id])
+  score          Float
+  totalQuestions Int
+  correctAnswers Int
+  passed         Boolean
+  createdAt      DateTime @default(now())
+
+  answers TestAnswer[]
+}
+
+model TestAnswer {
+  id               String      @id @default(cuid())
+  testAttemptId    String
+  questionId       String
+  selectedOptionId String?
+  isCorrect        Boolean
+  testAttempt      TestAttempt @relation(fields: [testAttemptId], references: [id], onDelete: Cascade)
+  question         Question    @relation(fields: [questionId], references: [id])
+}
+
+model Certificate {
+  id            String   @id @default(cuid())
+  userId        String
+  courseId      String
+  certificateNo String   @unique @default(cuid())
+  user          User     @relation(fields: [userId], references: [id])
+  course        Course   @relation(fields: [courseId], references: [id])
+  issuedAt      DateTime @default(now())
+
+  @@unique([userId, courseId])
+}
