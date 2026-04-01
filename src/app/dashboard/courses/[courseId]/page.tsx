@@ -48,7 +48,7 @@ interface EnrollmentData {
 export default function CourseDetailPage() {
   const params = useParams()
   const router = useRouter()
-  const courseId = params.courseId as string
+  const courseId = params?.courseId as string
   const [enrollment, setEnrollment] = useState<EnrollmentData | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedModule, setSelectedModule] = useState<Module | null>(null)

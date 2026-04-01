@@ -51,8 +51,8 @@ interface TestResult {
 export default function TestPage() {
   const params = useParams()
   const router = useRouter()
-  const courseId = params.courseId as string
-  const moduleId = params.moduleId as string
+  const courseId = params?.courseId as string
+  const moduleId = params?.moduleId as string
 
   const [testData, setTestData] = useState<TestData | null>(null)
   const [loading, setLoading] = useState(true)

@@ -20,7 +20,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [user, setUser] = useState<{ name: string; phone: string } | null>(null)
 
   // Auto-collapse sidebar on course detail pages
-  const isCourseDetail = /^\/dashboard\/courses\/[^/]+/.test(pathname)
+  const isCourseDetail = /^\/dashboard\/courses\/[^/]+/.test(pathname ?? '')
 
   useEffect(() => {
     if (isCourseDetail) setSidebarOpen(false)
@@ -65,7 +65,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         <nav className="p-4 flex-1 space-y-1">
           {navItems.map((item) => {
-            const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))
+            const active = pathname === item.href || (item.href !== '/dashboard' && pathname?.startsWith(item.href))
             return (
               <Link
                 key={item.href}

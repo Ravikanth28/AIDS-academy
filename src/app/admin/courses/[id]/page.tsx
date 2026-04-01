@@ -26,7 +26,7 @@ interface Course {
 export default function CourseManagePage() {
   const params = useParams()
   const router = useRouter()
-  const courseId = params.id as string
+  const courseId = params?.id as string
   const [course, setCourse] = useState<Course | null>(null)
   const [loading, setLoading] = useState(true)
   const [openModule, setOpenModule] = useState<string | null>(null)

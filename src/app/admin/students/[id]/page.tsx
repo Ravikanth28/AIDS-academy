@@ -45,7 +45,7 @@ interface StudentDetail {
 }
 
 export default function StudentDetailPage() {
-  const params = useParams()
+  const params = useParams()!
   const router = useRouter()
   const [student, setStudent] = useState<StudentDetail | null>(null)
   const [loading, setLoading] = useState(true)
