@@ -1,32 +1,38 @@
 import { PrismaClient } from '@prisma/client'
+import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
 async function main() {
   console.log('🌱 Seeding database...')
 
+  const adminPassword = await bcrypt.hash('Admin@123', 10)
+  const studentPassword = await bcrypt.hash('Student@123', 10)
+
   // Create Admin User
   const admin = await prisma.user.upsert({
     where: { phone: '6383749354' },
-    update: {},
+    update: { password: adminPassword },
     create: {
       name: 'Dr. Admin',
       phone: '6383749354',
       email: 'admin@aidslms.com',
       role: 'ADMIN',
+      password: adminPassword,
     },
   })
-  console.log(`✅ Admin created: ${admin.name} (${admin.phone})`)
+  console.log(`✅ Admin created: ${admin.name} (${admin.phone}) / email: admin@aidslms.com`)
 
   // Create Demo Student
   const student = await prisma.user.upsert({
     where: { phone: '6374217463' },
-    update: {},
+    update: { password: studentPassword },
     create: {
       name: 'Demo Student',
       phone: '6374217463',
       email: 'student@aidslms.com',
       role: 'STUDENT',
+      password: studentPassword,
     },
   })
   console.log(`✅ Student created: ${student.name} (${student.phone})`)
