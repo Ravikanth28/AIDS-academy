@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/middleware-helpers'
+import bcrypt from 'bcryptjs'
 
 // GET current student profile
 export async function GET(req: NextRequest) {
@@ -24,8 +25,25 @@ export async function PUT(req: NextRequest) {
   const { session, error } = await requireAuth(req)
   if (error) return error
 
-  const { name, phone, email } = await req.json()
+  const { name, phone, email, currentPassword, newPassword } = await req.json()
 
+  // --- Password change flow ---
+  if (newPassword) {
+    if (!currentPassword) return NextResponse.json({ error: 'Current password is required' }, { status: 400 })
+    if (newPassword.length < 6) return NextResponse.json({ error: 'New password must be at least 6 characters' }, { status: 400 })
+
+    const user = await prisma.user.findUnique({ where: { id: session!.userId }, select: { password: true } })
+    if (!user?.password) return NextResponse.json({ error: 'No password set on this account. Use email login to set one first.' }, { status: 400 })
+
+    const valid = await bcrypt.compare(currentPassword, user.password)
+    if (!valid) return NextResponse.json({ error: 'Current password is incorrect' }, { status: 401 })
+
+    const hashed = await bcrypt.hash(newPassword, 10)
+    await prisma.user.update({ where: { id: session!.userId }, data: { password: hashed } })
+    return NextResponse.json({ success: true })
+  }
+
+  // --- Profile update flow ---
   if (!name?.trim()) {
     return NextResponse.json({ error: 'Name is required' }, { status: 400 })
   }
