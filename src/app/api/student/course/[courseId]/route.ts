@@ -17,7 +17,16 @@ export async function GET(req: NextRequest, { params }: { params: { courseId: st
           modules: {
             orderBy: { order: 'asc' },
             include: {
-              videos: { orderBy: { order: 'asc' } },
+              videos: {
+                orderBy: { order: 'asc' },
+                include: {
+                  checkpointQuestions: {
+                    where: { timestamp: { not: null } },
+                    include: { options: { orderBy: { order: 'asc' } } },
+                    orderBy: { timestamp: 'asc' },
+                  },
+                },
+              },
               _count: { select: { questions: true } },
             },
           },

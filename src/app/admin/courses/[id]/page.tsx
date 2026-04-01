@@ -151,6 +151,7 @@ export default function CourseManagePage() {
                     moduleId={mod.id}
                     passingScore={mod.passingScore}
                     questionCount={mod.questionCount}
+                    videos={mod.videos}
                     onSave={fetchCourse}
                   />
                 )}

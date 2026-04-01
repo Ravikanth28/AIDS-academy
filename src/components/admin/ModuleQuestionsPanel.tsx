@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import {
-  Plus, Trash2, Save, Loader2, Upload, CheckCircle, X, ChevronDown, ChevronUp, Settings
+  Plus, Trash2, Save, Loader2, Upload, CheckCircle, X, ChevronDown, ChevronUp, Settings, Clock, PlayCircle
 } from 'lucide-react'
 
 interface Option {
@@ -17,17 +17,36 @@ interface QuestionForm {
   options: Option[]
 }
 
+interface CheckpointForm {
+  text: string
+  explanation: string
+  options: Option[]
+  videoId: string
+  timestamp: string // MM:SS format for input
+}
+
 interface Question {
   id: string
   text: string
   explanation: string
+  videoId: string | null
+  timestamp: number | null
+  video?: { id: string; title: string } | null
   options: { id: string; text: string; isCorrect: boolean; order: number }[]
+}
+
+interface VideoItem {
+  id: string
+  title: string
+  youtubeUrl: string
+  order: number
 }
 
 interface Props {
   moduleId: string
   passingScore: number
   questionCount: number
+  videos?: VideoItem[]
   onSave: () => void
 }
 
@@ -42,16 +61,43 @@ const emptyQuestion = (): QuestionForm => ({
   ],
 })
 
-export default function ModuleQuestionsPanel({ moduleId, passingScore, questionCount, onSave }: Props) {
+const emptyCheckpoint = (): CheckpointForm => ({
+  text: '',
+  explanation: '',
+  options: [
+    { text: '', isCorrect: false },
+    { text: '', isCorrect: false },
+    { text: '', isCorrect: false },
+    { text: '', isCorrect: false },
+  ],
+  videoId: '',
+  timestamp: '',
+})
+
+function parseTimestamp(ts: string): number | null {
+  const match = ts.match(/^(\d{1,2}):(\d{2})$/)
+  if (!match) return null
+  return parseInt(match[1]) * 60 + parseInt(match[2])
+}
+
+function formatTimestamp(seconds: number): string {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
+
+export default function ModuleQuestionsPanel({ moduleId, passingScore, questionCount, videos = [], onSave }: Props) {
   const [questions, setQuestions] = useState<QuestionForm[]>([emptyQuestion()])
   const [existingQs, setExistingQs] = useState<Question[]>([])
   const [loading, setLoading] = useState(false)
   const [loadingExisting, setLoadingExisting] = useState(true)
-  const [tab, setTab] = useState<'manual' | 'bulk' | 'settings'>('manual')
+  const [tab, setTab] = useState<'manual' | 'bulk' | 'checkpoint' | 'settings'>('manual')
   const [bulkCsv, setBulkCsv] = useState('')
   const [settings, setSettings] = useState({ passingScore, questionCount })
   const [savingSettings, setSavingSettings] = useState(false)
   const [expandedQ, setExpandedQ] = useState<number>(0)
+  const [checkpoints, setCheckpoints] = useState<CheckpointForm[]>([emptyCheckpoint()])
+  const [expandedCp, setExpandedCp] = useState<number>(0)
 
   useEffect(() => {
     fetchExisting()
@@ -199,6 +245,66 @@ export default function ModuleQuestionsPanel({ moduleId, passingScore, questionC
     }
   }
 
+  function updateCheckpoint(index: number, field: keyof CheckpointForm, value: string) {
+    const updated = [...checkpoints]
+    updated[index] = { ...updated[index], [field]: value }
+    setCheckpoints(updated)
+  }
+
+  function updateCheckpointOption(cpIdx: number, oIdx: number, field: keyof Option, value: string | boolean) {
+    const updated = [...checkpoints]
+    updated[cpIdx].options[oIdx] = { ...updated[cpIdx].options[oIdx], [field]: value }
+    setCheckpoints(updated)
+  }
+
+  function setCheckpointCorrect(cpIdx: number, oIdx: number) {
+    const updated = [...checkpoints]
+    updated[cpIdx].options = updated[cpIdx].options.map((o, i) => ({ ...o, isCorrect: i === oIdx }))
+    setCheckpoints(updated)
+  }
+
+  async function handleSaveCheckpoints() {
+    const valid = checkpoints.filter(
+      (cp) => cp.text && cp.videoId && cp.timestamp && cp.options.some((o) => o.isCorrect) && cp.options.every((o) => o.text)
+    )
+    if (valid.length === 0) {
+      return toast.error('Each checkpoint needs: question text, video, timestamp (MM:SS), all options filled, one correct')
+    }
+
+    // Validate timestamps
+    for (const cp of valid) {
+      if (parseTimestamp(cp.timestamp) === null) {
+        return toast.error(`Invalid timestamp "${cp.timestamp}". Use MM:SS format (e.g., 08:20)`)
+      }
+    }
+
+    setLoading(true)
+    try {
+      const payload = valid.map((cp) => ({
+        text: cp.text,
+        explanation: cp.explanation,
+        videoId: cp.videoId,
+        timestamp: parseTimestamp(cp.timestamp),
+        options: cp.options,
+      }))
+
+      const res = await fetch(`/api/admin/modules/${moduleId}/questions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questions: payload }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success(`${valid.length} checkpoint question(s) saved!`)
+      setCheckpoints([emptyCheckpoint()])
+      fetchExisting()
+      onSave()
+    } catch {
+      toast.error('Failed to save checkpoint questions')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div>
       {/* Tabs */}
@@ -206,6 +312,7 @@ export default function ModuleQuestionsPanel({ moduleId, passingScore, questionC
         {[
           { key: 'manual', label: 'Add Manually', icon: Plus },
           { key: 'bulk', label: 'Bulk CSV/Excel', icon: Upload },
+          { key: 'checkpoint', label: 'Checkpoint Qs', icon: Clock },
           { key: 'settings', label: 'Test Settings', icon: Settings },
         ].map(({ key, label, icon: Icon }) => (
           <button
@@ -328,6 +435,134 @@ export default function ModuleQuestionsPanel({ moduleId, passingScore, questionC
         </div>
       )}
 
+      {/* Checkpoint Questions */}
+      {tab === 'checkpoint' && (
+        <div>
+          {videos.length === 0 ? (
+            <div className="glass-card border border-amber-500/20 bg-amber-500/5 p-4 text-center">
+              <PlayCircle className="w-8 h-8 text-amber-400/50 mx-auto mb-2" />
+              <p className="text-sm text-amber-300/70">Add videos to this module first before creating checkpoint questions.</p>
+            </div>
+          ) : (
+            <>
+              <div className="glass-card border border-purple-500/20 p-4 mb-4 text-xs text-white/50">
+                <p className="text-purple-300 font-medium mb-1">Checkpoint Questions</p>
+                <p>Attach quiz questions to specific timestamps in videos. Students will see these while watching — the video pauses and they must answer correctly to continue.</p>
+              </div>
+
+              {checkpoints.map((cp, cpIdx) => (
+                <div key={cpIdx} className="glass-card border border-white/8 rounded-xl mb-3 overflow-hidden">
+                  <button
+                    onClick={() => setExpandedCp(expandedCp === cpIdx ? -1 : cpIdx)}
+                    className="w-full flex items-center gap-3 p-4 text-left hover:bg-white/3"
+                  >
+                    <span className="badge-purple text-xs flex-shrink-0">
+                      <Clock className="w-3 h-3 inline mr-1" />CP{cpIdx + 1}
+                    </span>
+                    <span className="text-sm flex-1 truncate text-white/70">
+                      {cp.text || 'New checkpoint question...'}
+                    </span>
+                    {cp.timestamp && <span className="text-xs text-purple-300 font-mono">{cp.timestamp}</span>}
+                    {expandedCp === cpIdx ? <ChevronUp className="w-4 h-4 text-white/30" /> : <ChevronDown className="w-4 h-4 text-white/30" />}
+                  </button>
+
+                  {expandedCp === cpIdx && (
+                    <div className="border-t border-white/5 p-4 space-y-3">
+                      {/* Video & Timestamp selectors */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-white/50 mb-1 block">Video</label>
+                          <select
+                            className="input-field text-sm"
+                            value={cp.videoId}
+                            onChange={(e) => updateCheckpoint(cpIdx, 'videoId', e.target.value)}
+                          >
+                            <option value="">Select video...</option>
+                            {videos.map((v) => (
+                              <option key={v.id} value={v.id}>
+                                {v.order + 1}. {v.title}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs text-white/50 mb-1 block">Timestamp (MM:SS)</label>
+                          <input
+                            className="input-field text-sm font-mono"
+                            placeholder="08:20"
+                            value={cp.timestamp}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/[^0-9:]/g, '')
+                              updateCheckpoint(cpIdx, 'timestamp', val)
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <textarea
+                        className="input-field resize-none text-sm"
+                        placeholder="Checkpoint question text (e.g., 'What method was just discussed for handling missing data?')"
+                        value={cp.text}
+                        rows={2}
+                        onChange={(e) => updateCheckpoint(cpIdx, 'text', e.target.value)}
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        {cp.options.map((opt, oIdx) => (
+                          <div key={oIdx} className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setCheckpointCorrect(cpIdx, oIdx)}
+                              className={`w-5 h-5 rounded-full border-2 flex-shrink-0 transition-all
+                                ${opt.isCorrect
+                                  ? 'border-green-400 bg-green-400'
+                                  : 'border-white/20 hover:border-white/40'}`}
+                            >
+                              {opt.isCorrect && <CheckCircle className="w-full h-full text-white fill-current" />}
+                            </button>
+                            <input
+                              className="input-field text-sm py-2 flex-1"
+                              placeholder={`Option ${oIdx + 1}`}
+                              value={opt.text}
+                              onChange={(e) => updateCheckpointOption(cpIdx, oIdx, 'text', e.target.value)}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      <input
+                        className="input-field text-sm"
+                        placeholder="Explanation (optional)"
+                        value={cp.explanation}
+                        onChange={(e) => updateCheckpoint(cpIdx, 'explanation', e.target.value)}
+                      />
+                      {checkpoints.length > 1 && (
+                        <button
+                          onClick={() => setCheckpoints(checkpoints.filter((_, i) => i !== cpIdx))}
+                          className="text-xs text-red-400/70 hover:text-red-400 flex items-center gap-1"
+                        >
+                          <Trash2 className="w-3 h-3" /> Remove checkpoint
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { setCheckpoints([...checkpoints, emptyCheckpoint()]); setExpandedCp(checkpoints.length) }}
+                  className="btn-secondary flex items-center gap-2 text-sm py-2.5"
+                >
+                  <Plus className="w-4 h-4" /> Add Checkpoint
+                </button>
+                <button onClick={handleSaveCheckpoints} disabled={loading} className="btn-primary flex items-center gap-2 text-sm py-2.5">
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  Save Checkpoints
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Settings */}
       {tab === 'settings' && (
         <div className="space-y-5 max-w-sm">
@@ -373,9 +608,20 @@ export default function ModuleQuestionsPanel({ moduleId, passingScore, questionC
           <div className="space-y-2">
             {existingQs.map((q, i) => (
               <div key={q.id} className="flex items-start gap-3 p-3 glass-card rounded-xl">
-                <span className="badge-purple text-xs flex-shrink-0 mt-0.5">Q{i + 1}</span>
+                <span className={`text-xs flex-shrink-0 mt-0.5 ${q.timestamp != null ? 'badge-purple' : 'badge-purple'}`}>
+                  {q.timestamp != null ? (
+                    <><Clock className="w-3 h-3 inline mr-1" />{formatTimestamp(q.timestamp)}</>
+                  ) : (
+                    <>Q{i + 1}</>
+                  )}
+                </span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm line-clamp-2">{q.text}</p>
+                  {q.video && (
+                    <p className="text-xs text-purple-300/60 mt-0.5 flex items-center gap-1">
+                      <PlayCircle className="w-3 h-3" /> {q.video.title}
+                    </p>
+                  )}
                   <div className="flex gap-1.5 mt-1 flex-wrap">
                     {q.options.map((o) => (
                       <span

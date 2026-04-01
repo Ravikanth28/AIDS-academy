@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin } from '@/lib/middleware-helpers'
 
-// POST: Add questions to a module (manual or bulk)
+// POST: Add questions to a module (manual or bulk, optionally with videoId/timestamp for checkpoints)
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const { error } = await requireAdmin(req)
   if (error) return error
 
   const body = await req.json()
   const { questions } = body
-  // questions: [{ text, explanation, options: [{ text, isCorrect, order }] }]
+  // questions: [{ text, explanation, options: [{ text, isCorrect, order }], videoId?, timestamp? }]
 
   if (!questions || !Array.isArray(questions) || questions.length === 0) {
     return NextResponse.json({ error: 'Questions array required' }, { status: 400 })
@@ -25,6 +25,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
           text: q.text,
           moduleId: params.id,
           explanation: q.explanation || '',
+          videoId: q.videoId || null,
+          timestamp: q.timestamp != null ? parseInt(q.timestamp) : null,
           options: {
             create: q.options.map((o: { text: string; isCorrect: boolean }, i: number) => ({
               text: o.text,
@@ -41,14 +43,23 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   return NextResponse.json(created, { status: 201 })
 }
 
-// GET: Get all questions for a module
+// GET: Get all questions for a module (optionally filter by videoId for checkpoints)
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const { error } = await requireAdmin(req)
   if (error) return error
 
+  const { searchParams } = new URL(req.url)
+  const videoId = searchParams.get('videoId')
+
+  const where: Record<string, unknown> = { moduleId: params.id }
+  if (videoId) {
+    where.videoId = videoId
+    where.timestamp = { not: null }
+  }
+
   const questions = await prisma.question.findMany({
-    where: { moduleId: params.id },
-    include: { options: { orderBy: { order: 'asc' } } },
+    where,
+    include: { options: { orderBy: { order: 'asc' } }, video: { select: { id: true, title: true } } },
     orderBy: { createdAt: 'asc' },
   })
   return NextResponse.json(questions)
