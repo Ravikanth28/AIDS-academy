@@ -56,7 +56,7 @@ export default function AdminDashboard() {
     : []
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div>
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-2 mb-2">

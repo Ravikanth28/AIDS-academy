@@ -180,9 +180,6 @@ export default function RegisterPage() {
             </Link>
           </p>
         </div>
-        <p className="text-center text-white/20 text-xs mt-4">
-          Admin phone: 6383749354 — OTP: 123456
-        </p>
       </div>
     </main>
   )

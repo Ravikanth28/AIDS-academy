@@ -57,11 +57,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Sidebar */}
       <aside
         className={`fixed top-0 left-0 h-full w-64 bg-dark-200 border-r border-white/5 z-30 
-        transition-transform duration-300
+        transition-transform duration-300 flex flex-col
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}
       >
         {/* Logo */}
-        <div className="p-5 border-b border-white/5">
+        <div className="p-5 border-b border-white/5 flex-shrink-0">
           <div className="flex items-center gap-2">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-600 to-cyan-500 flex items-center justify-center">
               <Brain className="w-5 h-5 text-white" />
@@ -74,7 +74,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         {/* Nav Items */}
-        <nav className="p-4 flex-1 space-y-1">
+        <nav className="p-4 flex-1 space-y-1 overflow-y-auto">
           {navItems.map((item) => {
             const active = pathname === item.href || (item.href !== '/admin' && pathname?.startsWith(item.href))
             return (
@@ -133,7 +133,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </header>
 
         <main className="flex-1 p-6">
-          {children}
+          <div className="w-full max-w-7xl mx-auto">{children}</div>
         </main>
       </div>
     </div>

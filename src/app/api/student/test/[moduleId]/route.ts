@@ -12,6 +12,7 @@ export async function GET(req: NextRequest, { params }: { params: { moduleId: st
     where: { id: params.moduleId },
     include: {
       questions: {
+        where: { timestamp: null }, // Exclude checkpoint questions from module tests
         include: { options: { orderBy: { order: 'asc' } } },
       },
     },

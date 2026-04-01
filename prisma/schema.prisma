@@ -82,6 +82,8 @@ model Video {
   moduleId    String
   module      Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
+
+  checkpointQuestions Question[]
 }
 
 model Question {
@@ -90,6 +92,9 @@ model Question {
   moduleId    String
   module      Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   explanation String?
+  videoId     String?
+  video       Video?   @relation(fields: [videoId], references: [id], onDelete: SetNull)
+  timestamp   Int?     // seconds into the video for checkpoint questions
   createdAt   DateTime @default(now())
 
   options     QuestionOption[]

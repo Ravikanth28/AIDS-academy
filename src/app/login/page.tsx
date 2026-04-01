@@ -4,17 +4,27 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
-import { Brain, Phone, ArrowRight, Zap, Loader2, Sparkles } from 'lucide-react'
+import { Brain, Phone, ArrowRight, Zap, Loader2, Sparkles, Mail, Lock, Eye, EyeOff } from 'lucide-react'
 
 type Step = 'phone' | 'otp'
+type LoginMode = 'otp' | 'email'
 
 export default function LoginPage() {
   const router = useRouter()
+  const [mode, setMode] = useState<LoginMode>('otp')
+
+  // OTP mode state
   const [step, setStep] = useState<Step>('phone')
-  const [loading, setLoading] = useState(false)
   const [phone, setPhone] = useState('')
   const [otp, setOtp] = useState('')
   const [demoOtp, setDemoOtp] = useState('')
+
+  // Email mode state
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+
+  const [loading, setLoading] = useState(false)
 
   async function handleRequestOtp(e: React.FormEvent) {
     e.preventDefault()
@@ -59,6 +69,37 @@ export default function LoginPage() {
     }
   }
 
+  async function handleEmailLogin(e: React.FormEvent) {
+    e.preventDefault()
+    if (!email.trim() || !password.trim()) return toast.error('Enter your email and password')
+    setLoading(true)
+    try {
+      const res = await fetch('/api/auth/email-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Login failed')
+      toast.success(`Welcome back, ${data.name}!`)
+      router.push(data.role === 'ADMIN' ? '/admin' : '/dashboard')
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Something went wrong')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function switchMode(newMode: LoginMode) {
+    setMode(newMode)
+    setStep('phone')
+    setOtp('')
+    setDemoOtp('')
+    setPhone('')
+    setEmail('')
+    setPassword('')
+  }
+
   return (
     <main className="min-h-screen bg-dark flex items-center justify-center px-4 relative overflow-hidden">
       {/* Background */}
@@ -81,73 +122,160 @@ export default function LoginPage() {
         </div>
 
         <div className="glass-card gradient-border p-8">
-          <div className="flex items-center gap-2 mb-6">
-            <Sparkles className="w-4 h-4 text-purple-400" />
-            <p className="text-white/50 text-sm">Login with your phone number via OTP</p>
+          {/* Mode Toggle Tabs */}
+          <div className="flex rounded-xl overflow-hidden border border-white/10 mb-6">
+            <button
+              type="button"
+              onClick={() => switchMode('otp')}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-all duration-200 ${
+                mode === 'otp'
+                  ? 'bg-purple-600/80 text-white'
+                  : 'bg-transparent text-white/40 hover:text-white/60'
+              }`}
+            >
+              <Phone className="w-4 h-4" />
+              Phone OTP
+            </button>
+            <button
+              type="button"
+              onClick={() => switchMode('email')}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-all duration-200 ${
+                mode === 'email'
+                  ? 'bg-purple-600/80 text-white'
+                  : 'bg-transparent text-white/40 hover:text-white/60'
+              }`}
+            >
+              <Mail className="w-4 h-4" />
+              Email & Password
+            </button>
           </div>
 
-          {step === 'phone' ? (
-            <form onSubmit={handleRequestOtp} className="space-y-5">
-              <div>
-                <label className="text-sm text-white/60 mb-2 block">Phone Number</label>
-                <div className="relative">
-                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40 text-sm font-medium">+91</div>
-                  <input
-                    type="tel"
-                    placeholder="10-digit mobile number"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                    className="input-field pl-14 text-lg tracking-wide"
-                    autoFocus
-                    required
-                  />
-                </div>
+          {/* OTP Login */}
+          {mode === 'otp' && (
+            <>
+              <div className="flex items-center gap-2 mb-6">
+                <Sparkles className="w-4 h-4 text-purple-400" />
+                <p className="text-white/50 text-sm">Login with your phone number via OTP</p>
               </div>
-              <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2 py-3.5">
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>
-                  <Phone className="w-4 h-4" /> Send OTP <ArrowRight className="w-4 h-4" />
-                </>}
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleVerifyOtp} className="space-y-5">
-              <div className="text-center mb-2">
-                <div className="badge-purple mx-auto w-fit mb-3">
-                  <Phone className="w-3 h-3 mr-1.5" />
-                  OTP sent to +91 {phone}
-                </div>
-                {demoOtp && (
-                  <div className="glass-card border border-amber-500/30 bg-amber-500/10 p-3 rounded-xl text-sm">
-                    <p className="text-amber-300/70 text-xs mb-1">Demo Mode — Your OTP:</p>
-                    <p className="font-mono font-bold text-amber-300 text-2xl tracking-widest">{demoOtp}</p>
+
+              {step === 'phone' ? (
+                <form onSubmit={handleRequestOtp} className="space-y-5">
+                  <div>
+                    <label className="text-sm text-white/60 mb-2 block">Phone Number</label>
+                    <div className="relative">
+                      <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40 text-sm font-medium">+91</div>
+                      <input
+                        type="tel"
+                        placeholder="10-digit mobile number"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                        className="input-field pl-14 text-lg tracking-wide"
+                        autoFocus
+                        required
+                      />
+                    </div>
                   </div>
-                )}
+                  <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2 py-3.5">
+                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>
+                      <Phone className="w-4 h-4" /> Send OTP <ArrowRight className="w-4 h-4" />
+                    </>}
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleVerifyOtp} className="space-y-5">
+                  <div className="text-center mb-2">
+                    <div className="badge-purple mx-auto w-fit mb-3">
+                      <Phone className="w-3 h-3 mr-1.5" />
+                      OTP sent to +91 {phone}
+                    </div>
+                    {demoOtp && (
+                      <div className="glass-card border border-amber-500/30 bg-amber-500/10 p-3 rounded-xl text-sm">
+                        <p className="text-amber-300/70 text-xs mb-1">Demo Mode — Your OTP:</p>
+                        <p className="font-mono font-bold text-amber-300 text-2xl tracking-widest">{demoOtp}</p>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="text-sm text-white/60 mb-2 block">Enter OTP</label>
+                    <input
+                      type="text"
+                      placeholder="• • • • • •"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      className="input-field text-center text-3xl tracking-widest font-mono h-16"
+                      autoFocus
+                      required
+                    />
+                  </div>
+                  <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2 py-3.5">
+                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>
+                      <Zap className="w-4 h-4" /> Verify OTP & Sign In
+                    </>}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setStep('phone'); setOtp(''); setDemoOtp('') }}
+                    className="btn-secondary w-full text-sm py-2.5"
+                  >
+                    Change Number
+                  </button>
+                </form>
+              )}
+            </>
+          )}
+
+          {/* Email & Password Login */}
+          {mode === 'email' && (
+            <>
+              <div className="flex items-center gap-2 mb-6">
+                <Sparkles className="w-4 h-4 text-purple-400" />
+                <p className="text-white/50 text-sm">Login with your email and password</p>
               </div>
-              <div>
-                <label className="text-sm text-white/60 mb-2 block">Enter OTP</label>
-                <input
-                  type="text"
-                  placeholder="• • • • • •"
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  className="input-field text-center text-3xl tracking-widest font-mono h-16"
-                  autoFocus
-                  required
-                />
-              </div>
-              <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2 py-3.5">
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>
-                  <Zap className="w-4 h-4" /> Verify OTP & Sign In
-                </>}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setStep('phone'); setOtp(''); setDemoOtp('') }}
-                className="btn-secondary w-full text-sm py-2.5"
-              >
-                Change Number
-              </button>
-            </form>
+
+              <form onSubmit={handleEmailLogin} className="space-y-5">
+                <div>
+                  <label className="text-sm text-white/60 mb-2 block">Email Address</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+                    <input
+                      type="email"
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="input-field pl-10"
+                      autoFocus
+                      required
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm text-white/60 mb-2 block">Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="input-field pl-10 pr-10"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2 py-3.5">
+                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>
+                    <ArrowRight className="w-4 h-4" /> Sign In
+                  </>}
+                </button>
+              </form>
+            </>
           )}
 
           <p className="text-center text-white/40 text-sm mt-6">
@@ -156,20 +284,6 @@ export default function LoginPage() {
               Register Now
             </Link>
           </p>
-        </div>
-
-        <div className="glass-card mt-4 p-4 border border-amber-500/20 bg-amber-500/5">
-          <p className="text-amber-300/70 text-xs text-center font-medium mb-2">Demo Accounts</p>
-          <div className="grid grid-cols-2 gap-3 text-center">
-            <div>
-              <p className="text-white/40 text-xs">Admin</p>
-              <p className="text-white/70 text-sm font-mono">6383749354</p>
-            </div>
-            <div>
-              <p className="text-white/40 text-xs">Student</p>
-              <p className="text-white/70 text-sm font-mono">6374217463</p>
-            </div>
-          </div>
         </div>
       </div>
     </main>

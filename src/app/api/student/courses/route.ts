@@ -12,7 +12,12 @@ export async function GET(req: NextRequest) {
     include: {
       modules: {
         orderBy: { order: 'asc' },
-        select: { id: true, title: true, order: true },
+        select: {
+          id: true,
+          title: true,
+          order: true,
+          _count: { select: { videos: true, questions: true } },
+        },
       },
       _count: { select: { enrollments: true } },
     },

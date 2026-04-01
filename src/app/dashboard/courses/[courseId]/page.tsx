@@ -5,15 +5,26 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import {
-  ArrowLeft, PlayCircle, CheckCircle, Lock, ClipboardList, ChevronRight, Loader2, Trophy
+  ArrowLeft, PlayCircle, CheckCircle, Lock, ClipboardList, ChevronRight, Loader2, Trophy,
+  Sparkles, FileText, Download, Brain, BookOpen, ExternalLink, Github, Database, FileSpreadsheet, Presentation
 } from 'lucide-react'
 import VideoPlayer from '@/components/student/VideoPlayer'
+import dynamic from 'next/dynamic'
+
+const MindMap = dynamic(() => import('@/components/student/MindMap'), { ssr: false })
 
 interface Video {
   id: string
   title: string
   youtubeUrl: string
   order: number
+  checkpointQuestions?: Array<{
+    id: string
+    text: string
+    timestamp: number
+    explanation: string | null
+    options: Array<{ id: string; text: string; isCorrect: boolean }>
+  }>
 }
 
 interface Module {
@@ -53,6 +64,21 @@ export default function CourseDetailPage() {
   const [loading, setLoading] = useState(true)
   const [selectedModule, setSelectedModule] = useState<Module | null>(null)
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null)
+  const [aiQuestions, setAiQuestions] = useState<Array<{text: string; explanation: string; options: Array<{text: string; isCorrect: boolean}>}>>([])
+  const [aiNotes, setAiNotes] = useState('')
+  const [loadingMcq, setLoadingMcq] = useState(false)
+  const [loadingNotes, setLoadingNotes] = useState(false)
+  const [showNotes, setShowNotes] = useState(false)
+  const [showAiQuiz, setShowAiQuiz] = useState(false)
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({})
+  const [quizSubmitted, setQuizSubmitted] = useState(false)
+  const [resources, setResources] = useState<Array<{type: string; title: string; url: string; description: string; source: string}>>([])
+  const [loadingResources, setLoadingResources] = useState(false)
+  const [showResources, setShowResources] = useState(false)
+  const [mindmapData, setMindmapData] = useState<{central: string; branches: Array<{label: string; children?: Array<{label: string; children?: Array<{label: string}>}>}>} | null>(null)
+  const [loadingMindmap, setLoadingMindmap] = useState(false)
+  const [showMindmap, setShowMindmap] = useState(false)
+  const [checkpoints, setCheckpoints] = useState<Array<{id: string; text: string; timestamp: number; explanation: string | null; options: Array<{id: string; text: string; isCorrect: boolean}>}>>([])
 
   useEffect(() => {
     fetchEnrollment()
@@ -135,7 +161,6 @@ export default function CourseDetailPage() {
       if (data.videoCompleted) {
         toast.success('🎉 All videos watched! You can now take the test.')
       } else {
-        // Auto-advance to next unwatched video
         const currentIndex = selectedModule.videos.findIndex((v) => v.id === videoId)
         const nextVideo = selectedModule.videos[currentIndex + 1]
         if (nextVideo) {
@@ -145,6 +170,120 @@ export default function CourseDetailPage() {
       await fetchEnrollment()
     } catch {
       // silent
+    }
+  }
+
+  async function handleGenerateMcq() {
+    if (!selectedModule) return
+    setLoadingMcq(true)
+    setAiQuestions([])
+    setSelectedAnswers({})
+    setQuizSubmitted(false)
+    try {
+      const res = await fetch(`/api/student/generate-mcq/${selectedModule.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ count: 5 }),
+      })
+      if (!res.ok) throw new Error('Failed to generate questions')
+      const data = await res.json()
+      setAiQuestions(data.questions)
+      setShowAiQuiz(true)
+      toast.success('AI questions generated!')
+    } catch {
+      toast.error('Could not generate questions. Transcript may be unavailable.')
+    } finally {
+      setLoadingMcq(false)
+    }
+  }
+
+  async function handleGenerateNotes() {
+    if (!selectedModule) return
+    setLoadingNotes(true)
+    setAiNotes('')
+    try {
+      const res = await fetch(`/api/student/generate-notes/${selectedModule.id}`, {
+        method: 'POST',
+      })
+      if (!res.ok) throw new Error('Failed to generate notes')
+      const data = await res.json()
+      setAiNotes(data.notes)
+      setShowNotes(true)
+      toast.success('Notes generated!')
+    } catch {
+      toast.error('Could not generate notes. Transcript may be unavailable.')
+    } finally {
+      setLoadingNotes(false)
+    }
+  }
+
+  function downloadNotes() {
+    if (!aiNotes || !selectedModule) return
+    const blob = new Blob([aiNotes], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${selectedModule.title.replace(/[^a-zA-Z0-9]/g, '_')}_notes.md`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  async function handleFindResources() {
+    if (!selectedModule) return
+    setLoadingResources(true)
+    setResources([])
+    try {
+      const res = await fetch(`/api/student/resources/${selectedModule.id}`, { method: 'POST' })
+      if (!res.ok) throw new Error('Failed to find resources')
+      const data = await res.json()
+      setResources(data.resources)
+      setShowResources(true)
+      toast.success('Resources found!')
+    } catch {
+      toast.error('Could not find resources.')
+    } finally {
+      setLoadingResources(false)
+    }
+  }
+
+  function getResourceIcon(type: string) {
+    switch (type) {
+      case 'github': return <Github className="w-4 h-4" />
+      case 'dataset': return <Database className="w-4 h-4" />
+      case 'notebook': return <FileSpreadsheet className="w-4 h-4" />
+      case 'slides': case 'presentation': return <Presentation className="w-4 h-4" />
+      case 'pdf': case 'article': return <FileText className="w-4 h-4" />
+      default: return <BookOpen className="w-4 h-4" />
+    }
+  }
+
+  function getResourceColor(type: string) {
+    switch (type) {
+      case 'github': return 'text-gray-300 bg-gray-500/15 border-gray-500/30'
+      case 'dataset': return 'text-emerald-300 bg-emerald-500/15 border-emerald-500/30'
+      case 'notebook': return 'text-orange-300 bg-orange-500/15 border-orange-500/30'
+      case 'slides': case 'presentation': return 'text-blue-300 bg-blue-500/15 border-blue-500/30'
+      case 'pdf': return 'text-red-300 bg-red-500/15 border-red-500/30'
+      case 'article': case 'tutorial': return 'text-yellow-300 bg-yellow-500/15 border-yellow-500/30'
+      default: return 'text-purple-300 bg-purple-500/15 border-purple-500/30'
+    }
+  }
+
+  async function handleGenerateMindmap() {
+    if (!selectedModule) return
+    setLoadingMindmap(true)
+    setMindmapData(null)
+    try {
+      const res = await fetch(`/api/student/mindmap/${selectedModule.id}`, { method: 'POST' })
+      if (!res.ok) throw new Error('Failed to generate mind map')
+      const data = await res.json()
+      setMindmapData(data.mindmap)
+      setShowMindmap(true)
+      toast.success('Mind map generated!')
+    } catch {
+      toast.error('Could not generate mind map.')
+    } finally {
+      setLoadingMindmap(false)
     }
   }
 
@@ -349,7 +488,165 @@ export default function CourseDetailPage() {
                   video={selectedVideo}
                   onWatched={() => handleVideoWatched(selectedVideo.id)}
                   isWatched={getProgress(selectedModule.id)?.videosWatched?.includes(selectedVideo.id) ?? false}
+                  checkpoints={selectedVideo.checkpointQuestions}
                 />
+              )}
+
+              {/* AI Tools Section */}
+              <div className="flex flex-wrap gap-3 mt-4">
+                <button
+                  onClick={handleGenerateMcq}
+                  disabled={loadingMcq}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-purple-500/15 border border-purple-500/30 text-purple-300 rounded-xl text-sm hover:bg-purple-500/25 transition-all disabled:opacity-50"
+                >
+                  {loadingMcq ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                  AI Practice Quiz
+                </button>
+                <button
+                  onClick={handleGenerateNotes}
+                  disabled={loadingNotes}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 rounded-xl text-sm hover:bg-cyan-500/25 transition-all disabled:opacity-50"
+                >
+                  {loadingNotes ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                  AI Study Notes
+                </button>
+                <button
+                  onClick={handleFindResources}
+                  disabled={loadingResources}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 rounded-xl text-sm hover:bg-emerald-500/25 transition-all disabled:opacity-50"
+                >
+                  {loadingResources ? <Loader2 className="w-4 h-4 animate-spin" /> : <BookOpen className="w-4 h-4" />}
+                  Find Resources
+                </button>
+                <button
+                  onClick={handleGenerateMindmap}
+                  disabled={loadingMindmap}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-amber-500/15 border border-amber-500/30 text-amber-300 rounded-xl text-sm hover:bg-amber-500/25 transition-all disabled:opacity-50"
+                >
+                  {loadingMindmap ? <Loader2 className="w-4 h-4 animate-spin" /> : <Brain className="w-4 h-4" />}
+                  Mind Map
+                </button>
+              </div>
+
+              {/* AI Practice Quiz Panel */}
+              {showAiQuiz && aiQuestions.length > 0 && (
+                <div className="glass-card border border-purple-500/20 p-5 mt-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-display font-semibold flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-purple-400" /> AI Practice Quiz
+                    </h3>
+                    <button onClick={() => { setShowAiQuiz(false); setAiQuestions([]); setQuizSubmitted(false); setSelectedAnswers({}) }} className="text-white/40 hover:text-white/60 text-sm">Close</button>
+                  </div>
+                  <div className="space-y-5">
+                    {aiQuestions.map((q, qi) => (
+                      <div key={qi} className="border-b border-white/5 pb-4 last:border-0">
+                        <p className="text-sm font-medium mb-2">{qi + 1}. {q.text}</p>
+                        <div className="space-y-1.5 ml-2">
+                          {q.options.map((opt, oi) => {
+                            const isSelected = selectedAnswers[qi] === oi
+                            const showResult = quizSubmitted
+                            let optClass = 'bg-white/3 border-white/10 hover:bg-white/6'
+                            if (showResult && opt.isCorrect) optClass = 'bg-green-500/15 border-green-500/40 text-green-300'
+                            else if (showResult && isSelected && !opt.isCorrect) optClass = 'bg-red-500/15 border-red-500/40 text-red-300'
+                            else if (isSelected) optClass = 'bg-purple-500/15 border-purple-500/40'
+                            return (
+                              <button
+                                key={oi}
+                                onClick={() => { if (!quizSubmitted) setSelectedAnswers(prev => ({ ...prev, [qi]: oi })) }}
+                                className={`w-full text-left text-sm px-3 py-2 rounded-lg border transition-all ${optClass}`}
+                              >
+                                {opt.text}
+                              </button>
+                            )
+                          })}
+                        </div>
+                        {quizSubmitted && q.explanation && (
+                          <p className="text-xs text-cyan-300/70 mt-2 ml-2">💡 {q.explanation}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {!quizSubmitted ? (
+                    <button
+                      onClick={() => setQuizSubmitted(true)}
+                      disabled={Object.keys(selectedAnswers).length < aiQuestions.length}
+                      className="btn-primary mt-4 text-sm py-2 disabled:opacity-40"
+                    >
+                      Check Answers
+                    </button>
+                  ) : (
+                    <div className="mt-4 flex items-center gap-3">
+                      <p className="text-sm text-white/60">
+                        Score: {aiQuestions.filter((q, i) => q.options[selectedAnswers[i]]?.isCorrect).length}/{aiQuestions.length}
+                      </p>
+                      <button onClick={handleGenerateMcq} className="text-sm text-purple-400 hover:text-purple-300">Generate New</button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* AI Notes Panel */}
+              {showNotes && aiNotes && (
+                <div className="glass-card border border-cyan-500/20 p-5 mt-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-display font-semibold flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-cyan-400" /> AI Study Notes
+                    </h3>
+                    <div className="flex items-center gap-2">
+                      <button onClick={downloadNotes} className="flex items-center gap-1.5 text-sm text-cyan-400 hover:text-cyan-300">
+                        <Download className="w-3.5 h-3.5" /> Download
+                      </button>
+                      <button onClick={() => setShowNotes(false)} className="text-white/40 hover:text-white/60 text-sm ml-2">Close</button>
+                    </div>
+                  </div>
+                  <div className="prose prose-invert prose-sm max-w-none text-white/80 whitespace-pre-wrap text-sm leading-relaxed">
+                    {aiNotes}
+                  </div>
+                </div>
+              )}
+
+              {/* Resources Panel */}
+              {showResources && resources.length > 0 && (
+                <div className="glass-card border border-emerald-500/20 p-5 mt-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-display font-semibold flex items-center gap-2">
+                      <BookOpen className="w-4 h-4 text-emerald-400" /> Learning Resources
+                    </h3>
+                    <button onClick={() => setShowResources(false)} className="text-white/40 hover:text-white/60 text-sm">Close</button>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {resources.map((r, i) => (
+                      <a
+                        key={i}
+                        href={r.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`flex items-start gap-3 p-3 rounded-xl border transition-all hover:scale-[1.02] ${getResourceColor(r.type)}`}
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          {getResourceIcon(r.type)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium flex items-center gap-1.5">
+                            {r.title}
+                            <ExternalLink className="w-3 h-3 flex-shrink-0 opacity-50" />
+                          </p>
+                          <p className="text-xs opacity-70 mt-0.5 line-clamp-2">{r.description}</p>
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <span className="text-[10px] uppercase tracking-wider opacity-50">{r.type}</span>
+                            <span className="text-[10px] opacity-40">•</span>
+                            <span className="text-[10px] opacity-50">{r.source}</span>
+                          </div>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Mind Map */}
+              {showMindmap && mindmapData && (
+                <MindMap data={mindmapData} onClose={() => setShowMindmap(false)} />
               )}
 
               {/* Take test prompt */}

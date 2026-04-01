@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { generateOTP } from '@/lib/utils'
+import { sendOTP } from '@/lib/sms'
 
 export async function POST(req: NextRequest) {
   try {
@@ -29,8 +30,14 @@ export async function POST(req: NextRequest) {
       data: { phone, otp, expiresAt },
     })
 
-    // In demo mode, return the OTP in the response
+    // Send OTP via SMS
+    const sent = await sendOTP(phone, otp)
+    if (!sent) {
+      return NextResponse.json({ error: 'Failed to send OTP. Check your phone number or try again.' }, { status: 500 })
+    }
+
     const responseData: Record<string, string> = { message: 'OTP sent successfully' }
+    // Only expose OTP in demo mode for development convenience
     if (process.env.DEMO_MODE === 'true') {
       responseData.demoOtp = otp
     }
