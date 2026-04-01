@@ -118,7 +118,7 @@ export default function AdminStudentsPage() {
   const totalEnrolled = students.filter(s => s.enrollments.length > 0).length
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="font-display text-3xl font-bold">

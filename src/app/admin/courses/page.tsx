@@ -27,16 +27,44 @@ interface Course {
   _count: { enrollments: number }
 }
 
-const CATEGORY_CONFIG: Record<string, { gradient: string; bg: string; text: string; icon: string }> = {
+const CATEGORY_PRESETS: Record<string, { gradient: string; bg: string; text: string; icon: string }> = {
   'AI & Data Science':  { gradient: 'from-purple-600 via-violet-600 to-cyan-500', bg: 'bg-purple-500/10', text: 'text-purple-300', icon: '🤖' },
   'Web Development':    { gradient: 'from-orange-500 via-amber-500 to-yellow-400', bg: 'bg-orange-500/10', text: 'text-orange-300', icon: '🌐' },
   'Database & SQL':     { gradient: 'from-blue-600 via-blue-500 to-teal-400', bg: 'bg-blue-500/10', text: 'text-blue-300', icon: '🗄️' },
   'Cybersecurity':      { gradient: 'from-red-600 via-rose-500 to-orange-400', bg: 'bg-red-500/10', text: 'text-red-300', icon: '🔐' },
-  default:              { gradient: 'from-pink-500 via-fuchsia-500 to-purple-600', bg: 'bg-pink-500/10', text: 'text-pink-300', icon: '📚' },
+  'Machine Learning':   { gradient: 'from-violet-600 via-purple-500 to-indigo-500', bg: 'bg-violet-500/10', text: 'text-violet-300', icon: '🧠' },
+  'Python':             { gradient: 'from-yellow-500 via-green-500 to-teal-500', bg: 'bg-yellow-500/10', text: 'text-yellow-300', icon: '🐍' },
+  'Mobile Development': { gradient: 'from-sky-500 via-blue-500 to-indigo-600', bg: 'bg-sky-500/10', text: 'text-sky-300', icon: '📱' },
+  'DevOps':             { gradient: 'from-slate-500 via-gray-600 to-zinc-500', bg: 'bg-slate-500/10', text: 'text-slate-300', icon: '⚙️' },
+  'Cloud Computing':    { gradient: 'from-cyan-500 via-sky-500 to-blue-600', bg: 'bg-cyan-500/10', text: 'text-cyan-300', icon: '☁️' },
+  'Networking':         { gradient: 'from-emerald-500 via-teal-500 to-cyan-600', bg: 'bg-emerald-500/10', text: 'text-emerald-300', icon: '🔗' },
+}
+
+const DYNAMIC_POOL = [
+  { gradient: 'from-pink-500 via-fuchsia-500 to-purple-600', bg: 'bg-pink-500/10', text: 'text-pink-300' },
+  { gradient: 'from-lime-500 via-green-500 to-emerald-600', bg: 'bg-lime-500/10', text: 'text-lime-300' },
+  { gradient: 'from-amber-500 via-orange-500 to-red-500', bg: 'bg-amber-500/10', text: 'text-amber-300' },
+  { gradient: 'from-indigo-500 via-blue-500 to-cyan-500', bg: 'bg-indigo-500/10', text: 'text-indigo-300' },
+  { gradient: 'from-rose-500 via-pink-500 to-fuchsia-600', bg: 'bg-rose-500/10', text: 'text-rose-300' },
+  { gradient: 'from-teal-500 via-cyan-500 to-sky-500', bg: 'bg-teal-500/10', text: 'text-teal-300' },
+  { gradient: 'from-violet-500 via-purple-600 to-pink-500', bg: 'bg-violet-500/10', text: 'text-violet-300' },
+  { gradient: 'from-yellow-400 via-amber-500 to-orange-600', bg: 'bg-yellow-500/10', text: 'text-yellow-300' },
+]
+
+const DYNAMIC_ICONS = ['📚', '🎯', '💡', '🚀', '⭐', '🔬', '🎓', '💻', '🌟', '🛠️', '📊', '🎨']
+
+function strHash(s: string): number {
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0
+  return Math.abs(h)
 }
 
 function getCat(cat: string) {
-  return CATEGORY_CONFIG[cat] || CATEGORY_CONFIG.default
+  if (CATEGORY_PRESETS[cat]) return CATEGORY_PRESETS[cat]
+  const h = strHash(cat)
+  const pool = DYNAMIC_POOL[h % DYNAMIC_POOL.length]
+  const icon = DYNAMIC_ICONS[h % DYNAMIC_ICONS.length]
+  return { ...pool, icon }
 }
 
 export default function AdminCoursesPage() {
@@ -129,7 +157,7 @@ export default function AdminCoursesPage() {
   const publishedCount = courses.filter(c => c.isPublished).length
 
   return (
-    <div className="max-w-7xl mx-auto pb-24">
+    <div className="pb-24">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
