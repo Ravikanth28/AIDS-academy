@@ -8,6 +8,8 @@ import CertificateCard from '@/components/student/CertificateCard'
 interface Certificate {
   id: string
   certificateNo: string
+  status: 'PENDING' | 'VERIFIED' | 'REVOKED'
+  revokedReason: string | null
   issuedAt: string
   course: {
     title: string
@@ -116,9 +118,17 @@ export default function CertificatesPage() {
                           <Star className="w-7 h-7 text-amber-200" />
                         </div>
                       </div>
-                      {/* Earned badge */}
-                      <div className="absolute top-2.5 right-3">
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 border border-green-500/25 font-medium backdrop-blur-sm">✓ Earned</span>
+      {/* Earned badge */}
+                      <div className="absolute top-2.5 right-3 flex items-center gap-1">
+                        {cert.status === 'VERIFIED' && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 border border-green-500/25 font-medium backdrop-blur-sm">✓ Verified</span>
+                        )}
+                        {cert.status === 'PENDING' && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/25 font-medium backdrop-blur-sm">⏳ Pending</span>
+                        )}
+                        {cert.status === 'REVOKED' && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/25 font-medium backdrop-blur-sm">✗ Revoked</span>
+                        )}
                       </div>
                     </div>
 
@@ -174,6 +184,8 @@ export default function CertificatesPage() {
                     courseDescription={cert.course.description}
                     issuedAt={cert.issuedAt}
                     certificateNo={cert.certificateNo}
+                    status={cert.status}
+                    revokedReason={cert.revokedReason}
                   />
                 </motion.div>
               )

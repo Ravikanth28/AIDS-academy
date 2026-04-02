@@ -263,7 +263,7 @@ export default function CourseDetailPage() {
       case 'dataset': return 'text-emerald-300 bg-emerald-500/15 border-emerald-500/30'
       case 'notebook': return 'text-orange-300 bg-orange-500/15 border-orange-500/30'
       case 'slides': case 'presentation': return 'text-blue-300 bg-blue-500/15 border-blue-500/30'
-      case 'pdf': return 'text-red-300 bg-red-500/15 border-red-500/30'
+      case 'pdf': return 'text-zinc-300 bg-zinc-500/15 border-zinc-500/30'
       case 'article': case 'tutorial': return 'text-yellow-300 bg-yellow-500/15 border-yellow-500/30'
       default: return 'text-purple-300 bg-purple-500/15 border-purple-500/30'
     }

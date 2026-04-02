@@ -121,6 +121,7 @@ export default function VideoPlayer({ video, onWatched, isWatched, checkpoints =
           modestbranding: 1,
           enablejsapi: 1,
           disablekb: 1, // Disable keyboard controls (arrow keys to seek)
+          controls: 0,  // Hide YouTube controls (removes gear/settings icon)
         },
         events: {
           onStateChange: (event: { data: number }) => {

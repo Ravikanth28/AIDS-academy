@@ -31,7 +31,7 @@ const CATEGORY_PRESETS: Record<string, { gradient: string; bg: string; text: str
   'AI & Data Science':  { gradient: 'from-purple-600 via-violet-600 to-cyan-500', bg: 'bg-purple-500/10', text: 'text-purple-300', icon: '🤖' },
   'Web Development':    { gradient: 'from-orange-500 via-amber-500 to-yellow-400', bg: 'bg-orange-500/10', text: 'text-orange-300', icon: '🌐' },
   'Database & SQL':     { gradient: 'from-blue-600 via-blue-500 to-teal-400', bg: 'bg-blue-500/10', text: 'text-blue-300', icon: '🗄️' },
-  'Cybersecurity':      { gradient: 'from-red-600 via-rose-500 to-orange-400', bg: 'bg-red-500/10', text: 'text-red-300', icon: '🔐' },
+  'Cybersecurity':      { gradient: 'from-zinc-500 via-gray-400 to-slate-400', bg: 'bg-zinc-500/10', text: 'text-zinc-300', icon: '🔐' },
   'Machine Learning':   { gradient: 'from-violet-600 via-purple-500 to-indigo-500', bg: 'bg-violet-500/10', text: 'text-violet-300', icon: '🧠' },
   'Python':             { gradient: 'from-yellow-500 via-green-500 to-teal-500', bg: 'bg-yellow-500/10', text: 'text-yellow-300', icon: '🐍' },
   'Mobile Development': { gradient: 'from-sky-500 via-blue-500 to-indigo-600', bg: 'bg-sky-500/10', text: 'text-sky-300', icon: '📱' },
@@ -43,9 +43,9 @@ const CATEGORY_PRESETS: Record<string, { gradient: string; bg: string; text: str
 const DYNAMIC_POOL = [
   { gradient: 'from-pink-500 via-fuchsia-500 to-purple-600', bg: 'bg-pink-500/10', text: 'text-pink-300' },
   { gradient: 'from-lime-500 via-green-500 to-emerald-600', bg: 'bg-lime-500/10', text: 'text-lime-300' },
-  { gradient: 'from-amber-500 via-orange-500 to-red-500', bg: 'bg-amber-500/10', text: 'text-amber-300' },
+  { gradient: 'from-amber-500 via-orange-500 to-yellow-500', bg: 'bg-amber-500/10', text: 'text-amber-300' },
   { gradient: 'from-indigo-500 via-blue-500 to-cyan-500', bg: 'bg-indigo-500/10', text: 'text-indigo-300' },
-  { gradient: 'from-rose-500 via-pink-500 to-fuchsia-600', bg: 'bg-rose-500/10', text: 'text-rose-300' },
+  { gradient: 'from-slate-400 via-zinc-500 to-gray-600', bg: 'bg-slate-500/10', text: 'text-slate-300' },
   { gradient: 'from-teal-500 via-cyan-500 to-sky-500', bg: 'bg-teal-500/10', text: 'text-teal-300' },
   { gradient: 'from-violet-500 via-purple-600 to-pink-500', bg: 'bg-violet-500/10', text: 'text-violet-300' },
   { gradient: 'from-yellow-400 via-amber-500 to-orange-600', bg: 'bg-yellow-500/10', text: 'text-yellow-300' },
@@ -291,7 +291,7 @@ export default function AdminCoursesPage() {
                     <span className={`px-2.5 py-1 rounded-full text-xs font-bold backdrop-blur-sm border ${
                       course.isPublished
                         ? 'bg-green-500/20 text-green-300 border-green-500/30'
-                        : 'bg-red-500/20 text-red-300 border-red-500/30'
+                        : 'bg-zinc-500/20 text-zinc-300 border-zinc-500/30'
                     }`}>
                       {course.isPublished ? '● Live' : '○ Draft'}
                     </span>
@@ -338,7 +338,7 @@ export default function AdminCoursesPage() {
                       onClick={() => togglePublish(course)}
                       className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
                         course.isPublished
-                          ? 'bg-white/5 text-white/40 hover:bg-red-500/15 hover:text-red-300'
+                          ? 'bg-white/5 text-white/40 hover:bg-zinc-500/15 hover:text-zinc-300'
                           : 'bg-white/5 text-white/40 hover:bg-green-500/15 hover:text-green-300'
                       }`}
                     >
@@ -353,7 +353,7 @@ export default function AdminCoursesPage() {
                     </Link>
                     <button
                       onClick={() => setDeleteTarget(course.id)}
-                      className="w-8 h-7 flex items-center justify-center rounded-lg bg-white/5 text-white/30 hover:bg-red-500/20 hover:text-red-400 transition-all"
+                      className="w-8 h-7 flex items-center justify-center rounded-lg bg-white/5 text-white/30 hover:bg-zinc-500/20 hover:text-zinc-300 transition-all"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -385,7 +385,7 @@ export default function AdminCoursesPage() {
             </button>
             <button
               onClick={() => setBulkConfirm(true)}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-red-500/20 text-red-300 border border-red-500/30 text-sm font-medium hover:bg-red-500/30 transition-all"
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-zinc-500/20 text-zinc-300 border border-zinc-500/30 text-sm font-medium hover:bg-zinc-500/30 transition-all"
             >
               <Trash2 className="w-3.5 h-3.5" /> Delete {selected.size}
             </button>
@@ -404,8 +404,8 @@ export default function AdminCoursesPage() {
               className="glass-card gradient-border p-6 w-full max-w-sm"
               onClick={e => e.stopPropagation()}
             >
-              <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
-                <AlertTriangle className="w-6 h-6 text-red-400" />
+              <div className="w-12 h-12 rounded-full bg-zinc-500/20 flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle className="w-6 h-6 text-zinc-400" />
               </div>
               <h3 className="font-display font-bold text-lg text-center mb-2">Delete Course?</h3>
               <p className="text-white/40 text-sm text-center mb-6">
@@ -414,7 +414,7 @@ export default function AdminCoursesPage() {
               <div className="flex gap-3">
                 <button onClick={() => setDeleteTarget(null)} className="flex-1 btn-secondary py-2.5 text-sm">Cancel</button>
                 <button onClick={() => deleteCourse(deleteTarget)} disabled={deleting}
-                  className="flex-1 py-2.5 rounded-xl bg-red-500/20 text-red-300 border border-red-500/30 text-sm font-medium hover:bg-red-500/30 transition-all disabled:opacity-50"
+                  className="flex-1 py-2.5 rounded-xl bg-zinc-500/20 text-zinc-300 border border-zinc-500/30 text-sm font-medium hover:bg-zinc-500/30 transition-all disabled:opacity-50"
                 >
                   {deleting ? 'Deleting...' : 'Delete'}
                 </button>
@@ -435,8 +435,8 @@ export default function AdminCoursesPage() {
               className="glass-card gradient-border p-6 w-full max-w-sm"
               onClick={e => e.stopPropagation()}
             >
-              <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
-                <Trash2 className="w-6 h-6 text-red-400" />
+              <div className="w-12 h-12 rounded-full bg-zinc-500/20 flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="w-6 h-6 text-zinc-400" />
               </div>
               <h3 className="font-display font-bold text-lg text-center mb-2">Delete {selected.size} Courses?</h3>
               <p className="text-white/40 text-sm text-center mb-6">
@@ -445,7 +445,7 @@ export default function AdminCoursesPage() {
               <div className="flex gap-3">
                 <button onClick={() => setBulkConfirm(false)} className="flex-1 btn-secondary py-2.5 text-sm">Cancel</button>
                 <button onClick={bulkDelete} disabled={deleting}
-                  className="flex-1 py-2.5 rounded-xl bg-red-500/20 text-red-300 border border-red-500/30 text-sm font-medium hover:bg-red-500/30 transition-all disabled:opacity-50"
+                  className="flex-1 py-2.5 rounded-xl bg-zinc-500/20 text-zinc-300 border border-zinc-500/30 text-sm font-medium hover:bg-zinc-500/30 transition-all disabled:opacity-50"
                 >
                   {deleting ? 'Deleting...' : `Delete All ${selected.size}`}
                 </button>

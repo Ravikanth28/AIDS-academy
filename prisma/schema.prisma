@@ -193,14 +193,22 @@ model TestAnswer {
   question         Question    @relation(fields: [questionId], references: [id])
 }
 
+enum CertificateStatus {
+  PENDING
+  VERIFIED
+  REVOKED
+}
+
 model Certificate {
-  id            String   @id @default(cuid())
+  id            String            @id @default(cuid())
   userId        String
   courseId      String
-  certificateNo String   @unique @default(cuid())
-  user          User     @relation(fields: [userId], references: [id])
-  course        Course   @relation(fields: [courseId], references: [id])
-  issuedAt      DateTime @default(now())
+  certificateNo String            @unique @default(cuid())
+  status        CertificateStatus @default(PENDING)
+  revokedReason String?
+  user          User              @relation(fields: [userId], references: [id])
+  course        Course            @relation(fields: [courseId], references: [id])
+  issuedAt      DateTime          @default(now())
 
   @@unique([userId, courseId])
 }

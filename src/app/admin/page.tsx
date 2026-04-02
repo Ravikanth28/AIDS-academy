@@ -145,7 +145,11 @@ export default function AdminDashboard() {
       const res = await fetch('/api/admin/leaderboard')
       if (res.ok) {
         const data = await res.json()
-        setLeaderboard((data.leaderboard ?? []).slice(0, 5))
+        setLeaderboard(
+          (data.leaderboard ?? [])
+            .map((e: LeaderEntry) => ({ ...e, name: e.user?.name ?? e.name ?? 'Unknown' }))
+            .slice(0, 5)
+        )
       }
     } catch { /* silently ignore */ }
   }

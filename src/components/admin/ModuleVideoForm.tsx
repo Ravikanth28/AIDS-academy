@@ -121,7 +121,7 @@ export default function ModuleVideoForm({ moduleId, existingVideos, onSave }: Pr
               {videos.length > 1 && (
                 <button
                   onClick={() => removeVideo(index)}
-                  className="p-1 rounded-lg hover:bg-red-500/20 text-white/30 hover:text-red-400 transition-colors"
+                  className="p-1 rounded-lg hover:bg-zinc-500/20 text-white/30 hover:text-zinc-300 transition-colors"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>

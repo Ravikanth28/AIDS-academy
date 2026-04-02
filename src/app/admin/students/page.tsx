@@ -185,7 +185,7 @@ export default function AdminStudentsPage() {
           {(certFilter !== 'all' || enrollFilter !== 'all' || search) && (
             <button
               onClick={() => { setCertFilter('all'); setEnrollFilter('all'); setSearch('') }}
-              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm text-red-400 hover:bg-red-500/10 transition-all border border-red-500/20"
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm text-zinc-400 hover:bg-zinc-500/10 transition-all border border-zinc-500/20"
             >
               <X className="w-3.5 h-3.5" /> Clear
             </button>

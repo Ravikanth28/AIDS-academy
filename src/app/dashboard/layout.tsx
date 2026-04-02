@@ -49,7 +49,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className={`fixed inset-0 bg-black/50 z-20 ${!isCourseDetail ? 'lg:hidden' : ''}`} onClick={() => setSidebarOpen(false)} />
       )}
 
-      <aside className={`fixed top-0 left-0 h-full w-64 bg-dark-200 border-r border-white/5 z-30 
+      <aside className={`fixed top-0 left-0 h-full w-64 bg-dark-100 border-r border-white/5 z-30 
         transition-transform duration-300 flex flex-col
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${!isCourseDetail ? 'lg:translate-x-0' : ''}`}>
         <div className="p-5 border-b border-white/5">
@@ -101,7 +101,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           )}
           <button
             onClick={handleLogout}
-            className="flex items-center gap-2 w-full px-4 py-2.5 rounded-xl text-sm text-white/50 hover:text-red-400 hover:bg-red-500/10 transition-all"
+            className="flex items-center gap-2 w-full px-4 py-2.5 rounded-xl text-sm text-white/50 hover:text-white/70 hover:bg-white/5 transition-all"
           >
             <LogOut className="w-4 h-4" /> Sign Out
           </button>

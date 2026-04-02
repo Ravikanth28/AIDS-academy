@@ -84,7 +84,16 @@ export default function Leaderboard({ apiUrl, showMyRank = true }: { apiUrl: str
     setLoading(true)
     fetch(`${apiUrl}?month=${month}&year=${year}`)
       .then(r => r.json())
-      .then(d => { setData(d); setLoading(false) })
+      .then(d => {
+        if (d?.leaderboard) {
+          d.leaderboard = d.leaderboard.map((e: LeaderEntry & { user?: { name: string } }) => ({
+            ...e,
+            name: e.name || e.user?.name || 'Unknown',
+          }))
+        }
+        setData(d)
+        setLoading(false)
+      })
       .catch(() => setLoading(false))
   }, [month, year, apiUrl])
 

@@ -14,7 +14,9 @@ export async function GET(req: NextRequest) {
   const userId = searchParams.get('userId') ?? undefined
   const action = searchParams.get('action') ?? undefined
 
-  const where: Record<string, unknown> = {}
+  const where: Record<string, unknown> = {
+    user: { role: 'STUDENT' },
+  }
   if (userId) where.userId = userId
   if (action) where.action = action
 

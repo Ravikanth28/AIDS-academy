@@ -16,6 +16,25 @@ export default function NewCoursePage() {
     thumbnail: '',
     moduleCount: 3,
   })
+  const [moduleNames, setModuleNames] = useState<string[]>(['Module 1', 'Module 2', 'Module 3'])
+
+  function handleModuleCountChange(newCount: number) {
+    setForm({ ...form, moduleCount: newCount })
+    setModuleNames((prev) => {
+      if (newCount > prev.length) {
+        return [...prev, ...Array.from({ length: newCount - prev.length }, (_, i) => `Module ${prev.length + i + 1}`)]
+      }
+      return prev.slice(0, newCount)
+    })
+  }
+
+  function updateModuleName(index: number, value: string) {
+    setModuleNames((prev) => {
+      const updated = [...prev]
+      updated[index] = value
+      return updated
+    })
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -27,7 +46,7 @@ export default function NewCoursePage() {
       const res = await fetch('/api/admin/courses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, moduleNames }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to create course')
@@ -105,7 +124,7 @@ export default function NewCoursePage() {
             <div className="flex items-center gap-4">
               <button
                 type="button"
-                onClick={() => setForm({ ...form, moduleCount: Math.max(1, form.moduleCount - 1) })}
+                onClick={() => handleModuleCountChange(Math.max(1, form.moduleCount - 1))}
                 className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
               >
                 <Minus className="w-4 h-4" />
@@ -115,7 +134,7 @@ export default function NewCoursePage() {
               </div>
               <button
                 type="button"
-                onClick={() => setForm({ ...form, moduleCount: Math.min(20, form.moduleCount + 1) })}
+                onClick={() => handleModuleCountChange(Math.min(20, form.moduleCount + 1))}
                 className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
               >
                 <Plus className="w-4 h-4" />
@@ -127,13 +146,31 @@ export default function NewCoursePage() {
             </p>
           </div>
 
+          {/* Module Names */}
+          <div>
+            <label className="text-sm text-white/60 mb-3 block">Module Names</label>
+            <div className="space-y-2">
+              {moduleNames.map((name, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <span className="text-white/30 text-xs w-6 text-right shrink-0">{i + 1}.</span>
+                  <input
+                    className="input-field text-sm py-2"
+                    placeholder={`Module ${i + 1}`}
+                    value={name}
+                    onChange={(e) => updateModuleName(i, e.target.value)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Preview */}
           <div className="glass-card border border-purple-500/20 p-4">
             <p className="text-xs text-white/40 mb-2">Course preview</p>
             <p className="font-medium text-sm">{form.title || 'Course Title'}</p>
             <div className="flex gap-2 mt-2 flex-wrap">
-              {Array.from({ length: form.moduleCount }, (_, i) => (
-                <span key={i} className="badge-purple text-xs">Module {i + 1}</span>
+              {moduleNames.map((name, i) => (
+                <span key={i} className="badge-purple text-xs">{name || `Module ${i + 1}`}</span>
               ))}
             </div>
           </div>

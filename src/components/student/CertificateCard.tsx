@@ -1,7 +1,7 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import { Download, Loader2, Trophy, Award } from 'lucide-react'
+import { useRef, useState, useEffect } from 'react'
+import { Download, Loader2, CheckCircle2, XCircle, Clock, ExternalLink } from 'lucide-react'
 
 interface CertificateCardProps {
   studentName: string
@@ -9,6 +9,8 @@ interface CertificateCardProps {
   courseDescription?: string
   issuedAt: string
   certificateNo: string
+  status?: 'PENDING' | 'VERIFIED' | 'REVOKED'
+  revokedReason?: string | null
 }
 
 export default function CertificateCard({
@@ -17,9 +19,16 @@ export default function CertificateCard({
   courseDescription,
   issuedAt,
   certificateNo,
+  status = 'PENDING',
+  revokedReason,
 }: CertificateCardProps) {
   const certRef = useRef<HTMLDivElement>(null)
   const [downloading, setDownloading] = useState(false)
+  const [origin, setOrigin] = useState('')
+
+  useEffect(() => { setOrigin(window.location.origin) }, [])
+
+  const verifyUrl = `${origin}/verify/${certificateNo}`
 
   const issueDate = new Date(issuedAt)
   const monthYear = issueDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
@@ -246,7 +255,7 @@ export default function CertificateCard({
                 <div style={{ width: 30, height: 1, background: '#d4a23720' }} />
               </div>
               <p style={{ color: '#d4a23745', fontSize: 10, fontFamily: 'monospace', margin: '0 14px', whiteSpace: 'nowrap' }}>
-                Certificate ID: {certificateNo.slice(-10).toUpperCase()}
+                Verify: {origin ? verifyUrl : `/verify/${certificateNo}`}
               </p>
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 8 }}>
                 <div style={{ width: 30, height: 1, background: '#d4a23720' }} />
@@ -311,6 +320,32 @@ export default function CertificateCard({
       </div>
 
 
+
+      {/* Status badge */}
+      {status === 'VERIFIED' && (
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-green-500/10 border border-green-500/25 text-green-300 text-sm">
+          <CheckCircle2 className="w-4 h-4" />
+          <span className="font-medium">Verified by AI·DS Academy</span>
+          <a href={verifyUrl} target="_blank" rel="noopener noreferrer" className="ml-auto text-green-400/60 hover:text-green-300">
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        </div>
+      )}
+      {status === 'PENDING' && (
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-sm">
+          <Clock className="w-4 h-4" />
+          <span className="font-medium">Pending admin verification</span>
+        </div>
+      )}
+      {status === 'REVOKED' && (
+        <div className="flex flex-col gap-1 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/25 text-red-300 text-sm">
+          <div className="flex items-center gap-2">
+            <XCircle className="w-4 h-4" />
+            <span className="font-medium">Certificate Revoked</span>
+          </div>
+          {revokedReason && <p className="text-xs text-red-400/60 pl-6">Reason: {revokedReason}</p>}
+        </div>
+      )}
 
       {/* Download button */}
       <button
