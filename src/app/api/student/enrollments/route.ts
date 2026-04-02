@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/middleware-helpers'
+import { logActivity, POINTS } from '@/lib/points'
 
 // GET enrolled courses for the student
 export async function GET(req: NextRequest) {
@@ -43,5 +44,6 @@ export async function POST(req: NextRequest) {
     data: { userId: session!.userId, courseId },
     include: { course: true },
   })
+  await logActivity(session!.userId, 'ENROLLED', `Enrolled in ${enrollment.course.title}`, POINTS.ENROLLED).catch(() => {})
   return NextResponse.json(enrollment, { status: 201 })
 }

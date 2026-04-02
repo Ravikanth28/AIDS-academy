@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/middleware-helpers'
+import { logActivity, POINTS } from '@/lib/points'
 
 // POST: Submit test answers
 export async function POST(req: NextRequest, { params }: { params: { moduleId: string } }) {
@@ -90,6 +91,8 @@ export async function POST(req: NextRequest, { params }: { params: { moduleId: s
     }
 
     // Check if all modules are completed for certificate
+    await logActivity(session!.userId, 'TEST_PASSED', `Passed test for module in course`, POINTS.TEST_PASSED).catch(() => {})
+
     const courseModules = await prisma.module.findMany({
       where: { courseId },
       select: { id: true },
@@ -103,11 +106,14 @@ export async function POST(req: NextRequest, { params }: { params: { moduleId: s
 
     if (allPassed) {
       // Issue certificate if not already issued
-      await prisma.certificate.upsert({
+      const cert = await prisma.certificate.upsert({
         where: { userId_courseId: { userId: session!.userId, courseId } },
         update: {},
         create: { userId: session!.userId, courseId },
       })
+      if (cert) {
+        await logActivity(session!.userId, 'CERTIFICATE_EARNED', `Earned certificate for course`, POINTS.CERTIFICATE_EARNED).catch(() => {})
+      }
     }
   }
 

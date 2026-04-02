@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -6,8 +6,12 @@ import { motion } from 'framer-motion'
 import {
   BookOpen, Award, TrendingUp, CheckCircle, PlayCircle,
   ChevronRight, Brain, Loader2, Trophy, Zap, Target,
-  Flame, Star, BarChart3, Clock,
+  Flame, Star, BarChart3, Clock, Sparkles,
 } from 'lucide-react'
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  RadialBarChart, RadialBar, PolarAngleAxis, Cell,
+} from 'recharts'
 
 interface ModuleProgress {
   moduleId: string
@@ -98,6 +102,63 @@ export default function DashboardPage() {
     return 'Good evening'
   })()
 
+  const avgTestScore = (() => {
+    const scores = enrollments.flatMap(e =>
+      e.moduleProgress.filter(p => p.testScore !== null).map(p => p.testScore as number))
+    return scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null
+  })()
+
+  const videosWatched = enrollments.reduce((a, e) =>
+    a + e.moduleProgress.filter(p => p.videoCompleted).length, 0)
+
+  const categoryMap = enrollments.reduce((acc, e) => {
+    acc[e.course.category] = (acc[e.course.category] || 0) + 1
+    return acc
+  }, {} as Record<string, number>)
+
+  const continueCourse = enrollments.find(e => {
+    const done = e.moduleProgress.filter(p => p.testPassed).length
+    const total = e.course.modules.length
+    return total > 0 && done > 0 && done < total
+  }) ?? enrollments.find(e =>
+    e.course.modules.length > 0 && e.moduleProgress.filter(p => p.testPassed).length === 0
+  )
+
+  // Chart data
+  const testScoreData = enrollments.flatMap(e =>
+    e.moduleProgress
+      .filter(p => p.testScore !== null)
+      .map(p => {
+        const mod = e.course.modules.find(m => m.id === p.moduleId)
+        return {
+          label: `M${mod?.order ?? '?'}`,
+          fullLabel: `${e.course.title.length > 14 ? e.course.title.slice(0, 12) + '…' : e.course.title} · M${mod?.order ?? '?'}`,
+          score: p.testScore as number,
+        }
+      })
+  )
+
+  const progressPie = [
+    { name: 'Completed', value: completedCourses, fill: '#10b981' },
+    { name: 'In Progress', value: enrollments.length - completedCourses, fill: '#a855f7' },
+  ].filter(d => d.value > 0)
+
+  const milestones = [    ...certificates.map(c => ({
+      type: 'cert' as const,
+      date: new Date(c.issuedAt),
+      label: 'Earned certificate for',
+      title: c.course.title,
+      color: 'amber' as const,
+    })),
+    ...enrollments.map(e => ({
+      type: 'enroll' as const,
+      date: new Date(e.enrolledAt),
+      label: 'Enrolled in',
+      title: e.course.title,
+      color: 'purple' as const,
+    })),
+  ].sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 5)
+
   if (loading) return (
     <div className="flex items-center justify-center min-h-64">
       <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
@@ -164,6 +225,49 @@ export default function DashboardPage() {
         </div>
       </motion.div>
 
+      {/* Continue Learning Banner */}
+      {continueCourse && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}
+          className="relative overflow-hidden rounded-2xl border border-cyan-500/20 bg-gradient-to-r from-cyan-900/20 via-dark-200 to-purple-900/15 p-5"
+        >
+          <div className="absolute -right-10 -top-10 w-40 h-40 bg-cyan-500/8 rounded-full blur-3xl pointer-events-none" />
+          <div className="relative flex items-center gap-4">
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500/25 to-purple-500/15 border border-cyan-500/20 flex items-center justify-center flex-shrink-0">
+              <PlayCircle className="w-6 h-6 text-cyan-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] text-cyan-400/70 uppercase tracking-wider font-semibold mb-0.5">
+                {continueCourse.moduleProgress.filter(p => p.testPassed).length > 0 ? '▶ Continue where you left off' : '🚀 Ready to start learning'}
+              </p>
+              <h3 className="font-display font-bold truncate">{continueCourse.course.title}</h3>
+              <p className="text-xs text-white/40 mt-0.5">
+                {continueCourse.moduleProgress.filter(p => p.testPassed).length}/{continueCourse.course.modules.length} modules complete
+                {continueCourse.course.modules.length > 0 && ` · ${Math.round(continueCourse.moduleProgress.filter(p => p.testPassed).length / continueCourse.course.modules.length * 100)}% done`}
+              </p>
+            </div>
+            <Link
+              href={`/dashboard/courses/${continueCourse.course.id}`}
+              className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-purple-500 text-white text-sm font-semibold hover:opacity-90 transition-all shadow-lg shadow-cyan-500/15"
+            >
+              {continueCourse.moduleProgress.filter(p => p.testPassed).length > 0 ? 'Resume' : 'Start'} <ChevronRight className="w-4 h-4" />
+            </Link>
+          </div>
+          {continueCourse.course.modules.length > 0 && (
+            <div className="mt-3">
+              <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.round(continueCourse.moduleProgress.filter(p => p.testPassed).length / continueCourse.course.modules.length * 100)}%` }}
+                  transition={{ delay: 0.5, duration: 0.8 }}
+                  className="h-full bg-gradient-to-r from-cyan-500 to-purple-500 rounded-full"
+                />
+              </div>
+            </div>
+          )}
+        </motion.div>
+      )}
+
       {/* Stats Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
@@ -189,6 +293,209 @@ export default function DashboardPage() {
           </motion.div>
         ))}
       </div>
+
+      {/* Learning Insights */}
+      {enrollments.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Avg Test Score */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.28 }}
+            className="glass-card p-5 flex items-center gap-4"
+          >
+            <div className="relative w-16 h-16 flex-shrink-0">
+              <svg className="w-16 h-16 -rotate-90" viewBox="0 0 60 60">
+                <circle cx="30" cy="30" r="23" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6" />
+                <circle cx="30" cy="30" r="23" fill="none"
+                  stroke="url(#scoreGrad)" strokeWidth="6" strokeLinecap="round"
+                  strokeDasharray={`${2 * Math.PI * 23}`}
+                  strokeDashoffset={`${2 * Math.PI * 23 * (1 - (avgTestScore ?? 0) / 100)}`}
+                  style={{ transition: 'stroke-dashoffset 1.2s ease' }}
+                />
+                <defs>
+                  <linearGradient id="scoreGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#22d3ee" />
+                    <stop offset="100%" stopColor="#a855f7" />
+                  </linearGradient>
+                </defs>
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-sm font-bold gradient-text">
+                  {avgTestScore !== null ? `${avgTestScore}%` : '—'}
+                </span>
+              </div>
+            </div>
+            <div>
+              <div className="font-display text-sm font-bold text-white/80">Avg Test Score</div>
+              <div className="text-xs text-white/40 mt-0.5">across all modules</div>
+              {avgTestScore !== null ? (
+                <div className={`text-[10px] mt-1.5 px-2 py-0.5 rounded-full inline-block font-medium ${
+                  avgTestScore >= 80 ? 'bg-green-500/20 text-green-300' :
+                  avgTestScore >= 60 ? 'bg-amber-500/20 text-amber-300' :
+                  'bg-red-500/20 text-red-300'
+                }`}>
+                  {avgTestScore >= 80 ? '🌟 Excellent' : avgTestScore >= 60 ? '👍 Good' : '📈 Keep going'}
+                </div>
+              ) : (
+                <div className="text-[10px] mt-1.5 text-white/20">No tests taken yet</div>
+              )}
+            </div>
+          </motion.div>
+
+          {/* Learning DNA */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.33 }}
+            className="glass-card p-5"
+          >
+            <p className="text-xs text-white/40 mb-3 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-purple-400" /> Your Learning DNA
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {Object.entries(categoryMap).map(([cat, count]) => {
+                const style = getCat(cat)
+                return (
+                  <span key={cat} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium border border-white/10 ${style.bg} ${style.text}`}>
+                    {style.icon} {cat.length > 14 ? cat.split(' ').slice(0, 2).join(' ') : cat}
+                    {count > 1 && <span className="opacity-50 text-[10px]">×{count}</span>}
+                  </span>
+                )
+              })}
+            </div>
+          </motion.div>
+
+          {/* Module Progress Bars */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.38 }}
+            className="glass-card p-5 space-y-3"
+          >
+            <p className="text-xs text-white/40 flex items-center gap-1.5">
+              <BarChart3 className="w-3.5 h-3.5 text-cyan-400" /> Module Completion
+            </p>
+            {[
+              { label: 'Videos Watched', val: videosWatched,    total: totalModules, from: 'from-cyan-500',  to: 'to-blue-500',    color: 'text-cyan-400'  },
+              { label: 'Tests Passed',   val: completedModules, total: totalModules, from: 'from-green-500', to: 'to-emerald-400', color: 'text-green-400' },
+            ].map(b => {
+              const pct = b.total > 0 ? Math.round((b.val / b.total) * 100) : 0
+              return (
+                <div key={b.label}>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[11px] text-white/50">{b.label}</span>
+                    <span className={`text-[11px] font-medium ${b.color}`}>{b.val}/{b.total}</span>
+                  </div>
+                  <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ delay: 0.5, duration: 0.8 }}
+                      className={`h-full bg-gradient-to-r ${b.from} ${b.to} rounded-full`}
+                    />
+                  </div>
+                </div>
+              )
+            })}
+          </motion.div>
+        </div>
+      )}
+
+      {/* ── Performance Analytics Charts ── */}
+      {enrollments.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.42 }}>
+          <h2 className="font-display font-bold text-lg flex items-center gap-2 mb-4">
+            <TrendingUp className="w-5 h-5 text-cyan-400" /> Performance Analytics
+          </h2>
+          <div className="grid md:grid-cols-2 gap-4">
+            {/* Test Scores Bar Chart */}
+            <div className="glass-card p-5">
+              <p className="text-xs text-white/40 mb-3 flex items-center gap-1.5">
+                <BarChart3 className="w-3.5 h-3.5 text-amber-400" /> Test Scores by Module
+              </p>
+              {testScoreData.length === 0 ? (
+                <div className="flex items-center justify-center h-32 text-white/20 text-sm">No test scores yet</div>
+              ) : (
+                <ResponsiveContainer width="100%" height={160}>
+                  <BarChart data={testScoreData} margin={{ top: 4, right: 4, left: -28, bottom: 0 }}>
+                    <XAxis dataKey="label" tick={{ fill: 'rgba(255,255,255,0.35)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis domain={[0, 100]} tick={{ fill: 'rgba(255,255,255,0.25)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      formatter={(v: number) => [`${v}%`, 'Score']}
+                      labelFormatter={(_, payload) => payload?.[0]?.payload?.fullLabel ?? ''}
+                      contentStyle={{ background: '#131325', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 11 }}
+                    />
+                    <Bar dataKey="score" radius={[6, 6, 0, 0]}>
+                      {testScoreData.map((d, i) => (
+                        <Cell key={i} fill={d.score >= 80 ? '#10b981' : d.score >= 60 ? '#f59e0b' : '#f43f5e'} opacity={0.85} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+
+            {/* Progress Radial Chart */}
+            <div className="glass-card p-5">
+              <p className="text-xs text-white/40 mb-3 flex items-center gap-1.5">
+                <Trophy className="w-3.5 h-3.5 text-purple-400" /> Course Progress Overview
+              </p>
+              <div className="flex items-center gap-6">
+                <div className="flex-shrink-0">
+                  <ResponsiveContainer width={130} height={130}>
+                    <RadialBarChart cx="50%" cy="50%" innerRadius="55%" outerRadius="90%"
+                      data={[{ name: 'progress', value: Math.round(overallProgress), fill: 'url(#progGrad)' }]}
+                      startAngle={90} endAngle={-270}>
+                      <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
+                      <RadialBar dataKey="value" cornerRadius={8} background={{ fill: 'rgba(255,255,255,0.06)' }} />
+                      <text x="50%" y="44%" textAnchor="middle" dominantBaseline="middle"
+                        style={{ fill: '#a855f7', fontSize: 22, fontWeight: 700 }}>
+                        {Math.round(overallProgress)}%
+                      </text>
+                      <text x="50%" y="60%" textAnchor="middle" dominantBaseline="middle"
+                        style={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }}>
+                        overall
+                      </text>
+                      <defs>
+                        <linearGradient id="progGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#a855f7" />
+                          <stop offset="100%" stopColor="#22d3ee" />
+                        </linearGradient>
+                      </defs>
+                    </RadialBarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="flex-1 space-y-3">
+                  {[
+                    { label: 'Completed Courses', val: completedCourses, total: enrollments.length, color: 'bg-green-500', text: 'text-green-400' },
+                    { label: 'Modules Passed', val: completedModules, total: totalModules, color: 'bg-purple-500', text: 'text-purple-400' },
+                    { label: 'Videos Watched', val: videosWatched, total: totalModules, color: 'bg-cyan-500', text: 'text-cyan-400' },
+                  ].map(row => {
+                    const pct = row.total > 0 ? Math.round((row.val / row.total) * 100) : 0
+                    return (
+                      <div key={row.label}>
+                        <div className="flex justify-between text-[11px] mb-1">
+                          <span className="text-white/40">{row.label}</span>
+                          <span className={row.text}>{row.val}/{row.total}</span>
+                        </div>
+                        <div className="h-1.5 bg-white/8 rounded-full overflow-hidden">
+                          <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ delay: 0.6, duration: 0.8 }}
+                            className={`h-full ${row.color} rounded-full`} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+              {/* Legend */}
+              {progressPie.length > 0 && (
+                <div className="flex gap-4 mt-3 pt-3 border-t border-white/5">
+                  {progressPie.map(p => (
+                    <div key={p.name} className="flex items-center gap-1.5 text-xs">
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ background: p.fill }} />
+                      <span className="text-white/40">{p.name}</span>
+                      <span className="font-semibold text-white/70">{p.value}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* Enrolled Courses */}
       <div>
@@ -353,6 +660,42 @@ export default function DashboardPage() {
                 </Link>
               </motion.div>
             ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Recent Activity Timeline */}
+      {milestones.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display font-bold text-lg flex items-center gap-2">
+              <Star className="w-5 h-5 text-purple-400" /> Recent Activity
+            </h2>
+          </div>
+          <div className="glass-card p-4">
+            <div className="space-y-0">
+              {milestones.map((m, i) => (
+                <div key={i} className="flex items-start gap-3 relative">
+                  {i < milestones.length - 1 && (
+                    <div className="absolute left-[18px] top-9 bottom-0 w-px bg-white/5" />
+                  )}
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 z-10 ${
+                    m.color === 'amber' ? 'bg-amber-500/20 text-amber-400' : 'bg-purple-500/20 text-purple-400'
+                  }`}>
+                    {m.type === 'cert' ? <Trophy className="w-4 h-4" /> : <BookOpen className="w-4 h-4" />}
+                  </div>
+                  <div className={`flex-1 py-2.5 ${i < milestones.length - 1 ? 'border-b border-white/5' : ''}`}>
+                    <p className="text-sm font-medium leading-snug">
+                      {m.label} <span className={m.color === 'amber' ? 'text-amber-300' : 'text-purple-300'}>{m.title}</span>
+                    </p>
+                    <p className="text-xs text-white/30 mt-0.5 flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {m.date.toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </motion.div>
       )}
