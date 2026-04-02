@@ -33,6 +33,11 @@ export async function GET(req: NextRequest, { params }: { params: { moduleId: st
     return NextResponse.json({ error: 'Complete all videos before taking the test' }, { status: 403 })
   }
 
+  // Check if module has any test questions
+  if (module_.questions.length === 0) {
+    return NextResponse.json({ error: 'No test questions available for this module yet. Please check back later.' }, { status: 404 })
+  }
+
   // Shuffle questions and limit by questionCount
   let questions = shuffleArray(module_.questions)
   questions = questions.slice(0, module_.questionCount)

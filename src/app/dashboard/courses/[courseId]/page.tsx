@@ -467,7 +467,7 @@ export default function CourseDetailPage() {
                   Module {selectedModule.order}: {selectedModule.title}
                 </h2>
                 {/* Test button */}
-                {getProgress(selectedModule.id)?.videoCompleted && (
+                {getProgress(selectedModule.id)?.videoCompleted && selectedModule._count.questions > 0 && (
                   <Link
                     href={`/dashboard/courses/${courseId}/test/${selectedModule.id}`}
                     className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all
@@ -478,6 +478,9 @@ export default function CourseDetailPage() {
                     <ClipboardList className="w-4 h-4" />
                     {getProgress(selectedModule.id)?.testPassed ? 'Retake Test' : 'Take Test'}
                   </Link>
+                )}
+                {getProgress(selectedModule.id)?.videoCompleted && selectedModule._count.questions === 0 && (
+                  <span className="text-xs text-white/30 italic">No test questions yet</span>
                 )}
               </div>
 

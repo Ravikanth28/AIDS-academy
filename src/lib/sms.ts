@@ -1,45 +1,41 @@
-import twilio from 'twilio'
-
-const accountSid = process.env.TWILIO_ACCOUNT_SID
-const authToken = process.env.TWILIO_AUTH_TOKEN
-const fromPhone = process.env.TWILIO_PHONE_NUMBER
-
-let client: twilio.Twilio | null = null
-
-function getClient() {
-  if (!client) {
-    if (!accountSid || !authToken || accountSid === 'your_twilio_account_sid') {
-      throw new Error('Twilio credentials not configured. Set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in .env')
-    }
-    client = twilio(accountSid, authToken)
-  }
-  return client
-}
+const ultraMsgInstanceId = process.env.ULTRAMSG_INSTANCE_ID
+const ultraMsgToken = process.env.ULTRAMSG_TOKEN
 
 export async function sendOTP(phone: string, otp: string): Promise<boolean> {
-  // In demo mode, skip actual SMS sending (for development only)
+  // In demo mode, skip actual WhatsApp sending (for development only)
   if (process.env.DEMO_MODE === 'true') {
     console.log(`[DEMO] OTP for +91${phone}: ${otp}`)
     return true
   }
 
-  if (!fromPhone || fromPhone === '+1234567890') {
-    console.error('Twilio phone number not configured. Set TWILIO_PHONE_NUMBER in .env')
+  if (!ultraMsgInstanceId || !ultraMsgToken) {
+    console.error('UltraMsg credentials not configured. Set ULTRAMSG_INSTANCE_ID and ULTRAMSG_TOKEN in .env')
     return false
   }
 
   try {
-    const twilioClient = getClient()
-    const message = await twilioClient.messages.create({
-      body: `Your AI·DS Academy verification code is: ${otp}. Valid for 10 minutes. Do not share this code.`,
-      from: fromPhone,
-      to: `+91${phone}`,
+    const normalizedPhone = phone.replace(/\D/g, '')
+    const to = normalizedPhone.startsWith('91') ? `+${normalizedPhone}` : `+91${normalizedPhone}`
+    const body = `Your AI·DS Academy verification code is: ${otp}. Valid for 10 minutes. Do not share this code.`
+
+    const response = await fetch(`https://api.ultramsg.com/${ultraMsgInstanceId}/messages/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ token: ultraMsgToken, to, body }),
     })
-    console.log(`SMS sent to +91${phone}, SID: ${message.sid}`)
+
+    const data = await response.json()
+    console.log(`UltraMsg API response for ${to}:`, JSON.stringify(data))
+    if (data?.error) {
+      console.error(`UltraMsg WhatsApp error for +${to}:`, data.error)
+      return false
+    }
+
+    console.log(`WhatsApp OTP sent to +${to}`)
     return true
   } catch (error: unknown) {
     const errMsg = error instanceof Error ? error.message : 'Unknown error'
-    console.error(`Twilio SMS error for +91${phone}:`, errMsg)
+    console.error(`UltraMsg WhatsApp error for +91${phone}:`, errMsg)
     return false
   }
 }

@@ -27,7 +27,11 @@ export async function GET(req: NextRequest, { params }: { params: { courseId: st
                   },
                 },
               },
-              _count: { select: { questions: true } },
+              _count: {
+                select: {
+                  questions: { where: { timestamp: null } }, // Only count test questions, not checkpoints
+                },
+              },
             },
           },
         },
