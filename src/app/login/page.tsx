@@ -1,14 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Brain, Phone, ArrowRight, Zap, Loader2, Sparkles, Mail, Lock, Eye, EyeOff, GraduationCap, BookOpen, Award, Star } from 'lucide-react'
-
-type Step = 'phone' | 'otp'
-type LoginMode = 'otp' | 'email'
+import { motion } from 'framer-motion'
+import { Brain, ArrowRight, Loader2, Sparkles, Mail, Lock, Eye, EyeOff, GraduationCap, BookOpen, Award, Star, Zap } from 'lucide-react'
 
 /* ── Glowing colour blob ── */
 function Blob({ className }: { className: string }) {
@@ -43,14 +40,7 @@ const orbitItems = [
 
 export default function LoginPage() {
   const router = useRouter()
-  const [mode, setMode] = useState<LoginMode>('otp')
   const [mounted, setMounted] = useState(false)
-
-  // OTP mode state
-  const [step, setStep] = useState<Step>('phone')
-  const [phone, setPhone] = useState('')
-  const [otp, setOtp] = useState('')
-  const [demoOtp, setDemoOtp] = useState('')
 
   // Email mode state
   const [email, setEmail] = useState('')
@@ -60,49 +50,6 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => { setMounted(true) }, [])
-
-  async function handleRequestOtp(e: React.FormEvent) {
-    e.preventDefault()
-    if (!/^\d{10}$/.test(phone)) return toast.error('Enter a valid 10-digit phone number')
-    setLoading(true)
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to send OTP')
-      toast.success('OTP sent!')
-      if (data.demoOtp) setDemoOtp(data.demoOtp)
-      setStep('otp')
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Something went wrong')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function handleVerifyOtp(e: React.FormEvent) {
-    e.preventDefault()
-    if (!otp || otp.length < 4) return toast.error('Enter the OTP')
-    setLoading(true)
-    try {
-      const res = await fetch('/api/auth/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, otp, action: 'login' }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'OTP verification failed')
-      toast.success(`Welcome back, ${data.name}!`)
-      router.push(data.role === 'ADMIN' ? '/admin' : '/dashboard')
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Something went wrong')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   async function handleEmailLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -123,16 +70,6 @@ export default function LoginPage() {
     } finally {
       setLoading(false)
     }
-  }
-
-  function switchMode(newMode: LoginMode) {
-    setMode(newMode)
-    setStep('phone')
-    setOtp('')
-    setDemoOtp('')
-    setPhone('')
-    setEmail('')
-    setPassword('')
   }
 
   return (
@@ -257,144 +194,39 @@ export default function LoginPage() {
           <div className="absolute top-0 left-1/4 right-1/4 h-px bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent" />
 
           <div className="p-8">
-            {/* Mode Toggle Tabs */}
-            <div className="flex rounded-2xl overflow-hidden border border-white/8 mb-6 p-1 bg-white/3">
-              {(['otp', 'email'] as LoginMode[]).map((m) => (
-                <motion.button
-                  key={m}
-                  type="button"
-                  onClick={() => switchMode(m)}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-xl transition-all duration-200 ${
-                    mode === m
-                      ? 'bg-gradient-to-r from-purple-600 to-violet-600 text-white shadow-lg shadow-purple-500/30'
-                      : 'text-white/40 hover:text-white/70'
-                  }`}
-                  whileTap={{ scale: 0.97 }}
-                >
-                  {m === 'otp' ? <Phone className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
-                  {m === 'otp' ? 'Phone OTP' : 'Email & Password'}
-                </motion.button>
-              ))}
+            <div className="flex items-center gap-2 mb-5">
+              <Sparkles className="w-4 h-4 text-purple-400" />
+              <p className="text-white/50 text-sm">Login with your email and password</p>
             </div>
-
-            {/* ── OTP Login ── */}
-            <AnimatePresence mode="wait">
-              {mode === 'otp' && (
-                <motion.div key="otp" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.25 }}>
-                  <div className="flex items-center gap-2 mb-5">
-                    <Sparkles className="w-4 h-4 text-purple-400" />
-                    <p className="text-white/50 text-sm">Login with your phone number via OTP</p>
-                  </div>
-
-                  <AnimatePresence mode="wait">
-                    {step === 'phone' ? (
-                      <motion.form key="phone" onSubmit={handleRequestOtp} className="space-y-5"
-                        initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.2 }}>
-                        <div>
-                          <label className="text-sm text-white/60 mb-2 block">Phone Number</label>
-                          <div className="relative group">
-                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 text-sm font-medium">+91</div>
-                            <input
-                              type="tel"
-                              placeholder="10-digit mobile number"
-                              value={phone}
-                              onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                              className="input-field pl-14 text-lg tracking-wide focus:ring-2 focus:ring-purple-500/30 transition-all"
-                              autoFocus
-                              required
-                            />
-                            <div className="absolute inset-0 rounded-xl ring-2 ring-purple-500/0 group-focus-within:ring-purple-500/20 pointer-events-none transition-all" />
-                          </div>
-                        </div>
-                        <motion.button type="submit" disabled={loading}
-                          className="btn-primary w-full flex items-center justify-center gap-2 py-3.5 text-base font-semibold shadow-lg shadow-purple-500/25"
-                          whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>
-                            <Phone className="w-4 h-4" /> Send OTP <ArrowRight className="w-4 h-4" />
-                          </>}
-                        </motion.button>
-                      </motion.form>
-                    ) : (
-                      <motion.form key="otp-step" onSubmit={handleVerifyOtp} className="space-y-5"
-                        initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.2 }}>
-                        <div className="text-center mb-2">
-                          <div className="badge-purple mx-auto w-fit mb-3">
-                            <Phone className="w-3 h-3 mr-1.5" />
-                            OTP sent to +91 {phone}
-                          </div>
-                          {demoOtp && (
-                            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-                              className="border border-amber-500/30 bg-amber-500/10 p-3 rounded-2xl text-sm">
-                              <p className="text-amber-300/70 text-xs mb-1">Demo Mode — Your OTP:</p>
-                              <p className="font-mono font-bold text-amber-300 text-2xl tracking-widest">{demoOtp}</p>
-                            </motion.div>
-                          )}
-                        </div>
-                        <div>
-                          <label className="text-sm text-white/60 mb-2 block">Enter OTP</label>
-                          <input
-                            type="text"
-                            placeholder="• • • • • •"
-                            value={otp}
-                            onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                            className="input-field text-center text-3xl tracking-widest font-mono h-16"
-                            autoFocus required
-                          />
-                        </div>
-                        <motion.button type="submit" disabled={loading}
-                          className="btn-primary w-full flex items-center justify-center gap-2 py-3.5 font-semibold shadow-lg shadow-purple-500/25"
-                          whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Zap className="w-4 h-4" /> Verify OTP & Sign In</>}
-                        </motion.button>
-                        <button type="button" onClick={() => { setStep('phone'); setOtp(''); setDemoOtp('') }}
-                          className="btn-secondary w-full text-sm py-2.5">
-                          Change Number
-                        </button>
-                      </motion.form>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
-              )}
-
-              {/* ── Email Login ── */}
-              {mode === 'email' && (
-                <motion.div key="email" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }}>
-                  <div className="flex items-center gap-2 mb-5">
-                    <Sparkles className="w-4 h-4 text-purple-400" />
-                    <p className="text-white/50 text-sm">Login with your email and password</p>
-                  </div>
-                  <form onSubmit={handleEmailLogin} className="space-y-5">
-                    <div>
-                      <label className="text-sm text-white/60 mb-2 block">Email Address</label>
-                      <div className="relative">
-                        <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
-                        <input type="email" placeholder="you@example.com" value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          className="input-field pl-10" autoFocus required />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-sm text-white/60 mb-2 block">Password</label>
-                      <div className="relative">
-                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
-                        <input type={showPassword ? 'text' : 'password'} placeholder="Enter your password" value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          className="input-field pl-10 pr-10" required />
-                        <button type="button" onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors">
-                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </div>
-                    <motion.button type="submit" disabled={loading}
-                      className="btn-primary w-full flex items-center justify-center gap-2 py-3.5 font-semibold shadow-lg shadow-purple-500/25"
-                      whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                      {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><ArrowRight className="w-4 h-4" /> Sign In</>}
-                    </motion.button>
-                  </form>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <form onSubmit={handleEmailLogin} className="space-y-5">
+              <div>
+                <label className="text-sm text-white/60 mb-2 block">Email Address</label>
+                <div className="relative">
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+                  <input type="email" placeholder="you@example.com" value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="input-field pl-10" autoFocus required />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm text-white/60 mb-2 block">Password</label>
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+                  <input type={showPassword ? 'text' : 'password'} placeholder="Enter your password" value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="input-field pl-10 pr-10" required />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors">
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+              <motion.button type="submit" disabled={loading}
+                className="btn-primary w-full flex items-center justify-center gap-2 py-3.5 font-semibold shadow-lg shadow-purple-500/25"
+                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><ArrowRight className="w-4 h-4" /> Sign In</>}
+              </motion.button>
+            </form>
 
             <p className="text-center text-white/40 text-sm mt-6">
               New to AI·DS Academy?{' '}
