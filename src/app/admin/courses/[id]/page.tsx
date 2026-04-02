@@ -61,7 +61,7 @@ export default function CourseManagePage() {
   if (!course) return null
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div>
       {/* Header */}
       <div className="flex items-start gap-3 mb-8">
         <Link href="/admin/courses" className="p-2 rounded-xl hover:bg-white/5 transition-colors mt-1">

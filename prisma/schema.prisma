@@ -17,10 +17,40 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  otpSessions    OTPSession[]
-  enrollments    Enrollment[]
-  testAttempts   TestAttempt[]
-  certificates   Certificate[]
+  otpSessions     OTPSession[]
+  enrollments     Enrollment[]
+  testAttempts    TestAttempt[]
+  certificates    Certificate[]
+  activityLogs    ActivityLog[]
+  monthlyPoints   MonthlyPoints[]
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String   // "LOGIN", "LOGOUT", "VIDEO_WATCHED", "TEST_PASSED", "CERTIFICATE_EARNED", "ENROLLED"
+  detail    String?
+  points    Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model MonthlyPoints {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  month     Int      // 1-12
+  year      Int
+  points    Int      @default(0)
+  rank      Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, month, year])
+  @@index([month, year])
 }
 
 enum Role {

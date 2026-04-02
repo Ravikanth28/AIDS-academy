@@ -114,7 +114,7 @@ export default function StudentDetailPage() {
   if (!student) return null
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div>
       <div className="flex items-center gap-3 mb-8">
         <Link href="/admin/students" className="p-2 rounded-xl hover:bg-white/5 transition-colors">
           <ArrowLeft className="w-5 h-5 text-white/50" />

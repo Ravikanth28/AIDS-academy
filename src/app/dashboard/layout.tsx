@@ -4,11 +4,12 @@ import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
-import { Brain, LayoutDashboard, BookOpen, Award, LogOut, Menu, ChevronRight, UserCircle } from 'lucide-react'
+import { Brain, LayoutDashboard, BookOpen, Award, LogOut, Menu, ChevronRight, UserCircle, Trophy } from 'lucide-react'
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/courses', label: 'My Courses', icon: BookOpen },
+  { href: '/dashboard/leaderboard', label: 'Leaderboard', icon: Trophy },
   { href: '/dashboard/certificates', label: 'Certificates', icon: Award },
   { href: '/dashboard/profile', label: 'My Profile', icon: UserCircle },
 ]
