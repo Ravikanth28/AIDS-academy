@@ -247,21 +247,30 @@ export default function CertificateCard({
               <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, #d4a23725, transparent)' }} />
             </div>
 
-            {/* Cert No row with side lines */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', marginBottom: 14 }}>
+            {/* Certificate ID row */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', marginBottom: 4 }}>
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
                 <div style={{ width: 30, height: 1, background: 'linear-gradient(90deg, transparent, #d4a23720)' }} />
                 <span style={{ color: '#d4a23730', fontSize: 6 }}>◆</span>
                 <div style={{ width: 30, height: 1, background: '#d4a23720' }} />
               </div>
-              <p style={{ color: '#d4a23745', fontSize: 10, fontFamily: 'monospace', margin: '0 14px', whiteSpace: 'nowrap' }}>
-                Verify: {origin ? verifyUrl : `/verify/${certificateNo}`}
+              <p style={{ color: '#d4a23755', fontSize: 10, fontFamily: 'monospace', margin: '0 14px', whiteSpace: 'nowrap' }}>
+                Certificate ID: {certificateNo.toUpperCase()}
               </p>
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 8 }}>
                 <div style={{ width: 30, height: 1, background: '#d4a23720' }} />
                 <span style={{ color: '#d4a23730', fontSize: 6 }}>◆</span>
                 <div style={{ width: 30, height: 1, background: 'linear-gradient(90deg, #d4a23720, transparent)' }} />
               </div>
+            </div>
+
+            {/* Verification URL row */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', marginBottom: 14 }}>
+              <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, transparent, #d4a23718)' }} />
+              <p style={{ color: '#d4a23740', fontSize: 9, fontFamily: 'monospace', margin: '0 14px', whiteSpace: 'nowrap' }}>
+                Verify at: {origin ? verifyUrl : `${typeof window !== 'undefined' ? window.location.origin : ''}/verify/${certificateNo}`}
+              </p>
+              <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, #d4a23718, transparent)' }} />
             </div>
 
             {/* Bottom ornate divider - full width */}
@@ -347,18 +356,24 @@ export default function CertificateCard({
         </div>
       )}
 
-      {/* Download button */}
-      <button
-        onClick={downloadPDF}
-        disabled={downloading}
-        className="w-full btn-primary flex items-center justify-center gap-2"
-      >
-        {downloading ? (
-          <><Loader2 className="w-4 h-4 animate-spin" /> Generating PDF...</>
-        ) : (
-          <><Download className="w-4 h-4" /> Download Certificate (PDF)</>
-        )}
-      </button>
+      {/* Download button — only when verified */}
+      {status === 'VERIFIED' ? (
+        <button
+          onClick={downloadPDF}
+          disabled={downloading}
+          className="w-full btn-primary flex items-center justify-center gap-2"
+        >
+          {downloading ? (
+            <><Loader2 className="w-4 h-4 animate-spin" /> Generating PDF...</>
+          ) : (
+            <><Download className="w-4 h-4" /> Download Certificate (PDF)</>
+          )}
+        </button>
+      ) : (
+        <div className="w-full py-3 rounded-xl bg-white/5 border border-white/10 text-center text-white/30 text-sm">
+          Download available after admin verification
+        </div>
+      )}
     </div>
   )
 }
