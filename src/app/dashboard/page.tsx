@@ -414,7 +414,7 @@ export default function DashboardPage() {
                     <XAxis dataKey="label" tick={{ fill: 'rgba(255,255,255,0.35)', fontSize: 10 }} axisLine={false} tickLine={false} />
                     <YAxis domain={[0, 100]} tick={{ fill: 'rgba(255,255,255,0.25)', fontSize: 10 }} axisLine={false} tickLine={false} />
                     <Tooltip
-                      formatter={(v: number) => [`${v}%`, 'Score']}
+                      formatter={(v) => [`${v ?? 0}%`, 'Score']}
                       labelFormatter={(_, payload) => payload?.[0]?.payload?.fullLabel ?? ''}
                       contentStyle={{ background: '#131325', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 11 }}
                     />

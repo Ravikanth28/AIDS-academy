@@ -277,7 +277,7 @@ export default function AdminDashboard() {
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
                   <Pie data={stats.categoryPie} cx="50%" cy="50%" innerRadius={50} outerRadius={80}
-                    paddingAngle={3} dataKey="value" label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
+                    paddingAngle={3} dataKey="value" label={({ percent }) => `${((percent ?? 0) * 100).toFixed(0)}%`}
                     labelLine={false}>
                     {stats.categoryPie.map((_, i) => (
                       <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} opacity={0.85} />
