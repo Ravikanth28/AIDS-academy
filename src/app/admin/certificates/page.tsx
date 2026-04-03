@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Award, CheckCircle2, XCircle, Clock, Loader2, Search,
-  ExternalLink, Copy, CheckCheck, RotateCcw, X
+  ExternalLink, Copy, CheckCheck, RotateCcw, X, Filter,
+  BarChart3, Target, TrendingUp, PieChart, ArrowUpDown
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
@@ -29,11 +30,16 @@ export default function AdminCertificatesPage() {
   const [certs, setCerts] = useState<Cert[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'VERIFIED' | 'REVOKED'>('ALL')
+  const [filterStatus, setFilterStatus] = useState<string>('ALL')
+  const [filterStudent, setFilterStudent] = useState<string>('ALL')
+  const [filterCourse, setFilterCourse] = useState<string>('ALL')
+  const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'name-asc' | 'name-desc'>('date-desc')
   const [revokeTarget, setRevokeTarget] = useState<Cert | null>(null)
   const [revokeReason, setRevokeReason] = useState('')
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [bulkLoading, setBulkLoading] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   useEffect(() => { fetchCerts() }, [])
 
@@ -46,6 +52,53 @@ export default function AdminCertificatesPage() {
       setLoading(false)
     }
   }
+
+  // Unique lists for filters
+  const students = useMemo(() => {
+    const map = new Map<string, string>()
+    certs.forEach(c => map.set(c.user.id, c.user.name))
+    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]))
+  }, [certs])
+
+  const courses = useMemo(() => {
+    const map = new Map<string, string>()
+    certs.forEach(c => map.set(c.course.id, c.course.title))
+    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]))
+  }, [certs])
+
+  // Filtered + sorted list
+  const filtered = useMemo(() => {
+    let list = certs.filter(c => {
+      if (filterStatus !== 'ALL' && c.status !== filterStatus) return false
+      if (filterStudent !== 'ALL' && c.user.id !== filterStudent) return false
+      if (filterCourse !== 'ALL' && c.course.id !== filterCourse) return false
+      if (search) {
+        const q = search.toLowerCase()
+        if (!c.user.name.toLowerCase().includes(q) && !c.course.title.toLowerCase().includes(q) && !c.certificateNo.toLowerCase().includes(q)) return false
+      }
+      return true
+    })
+    list.sort((a, b) => {
+      switch (sortBy) {
+        case 'date-desc': return new Date(b.issuedAt).getTime() - new Date(a.issuedAt).getTime()
+        case 'date-asc':  return new Date(a.issuedAt).getTime() - new Date(b.issuedAt).getTime()
+        case 'name-asc':  return a.user.name.localeCompare(b.user.name)
+        case 'name-desc': return b.user.name.localeCompare(a.user.name)
+      }
+    })
+    return list
+  }, [certs, filterStatus, filterStudent, filterCourse, search, sortBy])
+
+  // Live stats based on filtered data
+  const stats = useMemo(() => {
+    const total = filtered.length
+    const uniqueStudents = new Set(filtered.map(c => c.user.id)).size
+    const verified = filtered.filter(c => c.status === 'VERIFIED').length
+    const pending = filtered.filter(c => c.status === 'PENDING').length
+    const revoked = filtered.filter(c => c.status === 'REVOKED').length
+    const verifyRate = total > 0 ? ((verified / total) * 100).toFixed(1) : '0.0'
+    return { total, uniqueStudents, verified, pending, revoked, verifyRate }
+  }, [filtered])
 
   async function handleVerify(cert: Cert) {
     setActionLoading(cert.id)
@@ -86,6 +139,46 @@ export default function AdminCertificatesPage() {
     }
   }
 
+  async function handleBulkVerify() {
+    const ids = Array.from(selectedIds)
+    const toVerify = ids.filter(id => certs.find(c => c.id === id)?.status !== 'VERIFIED')
+    if (toVerify.length === 0) return toast.error('No unverified certificates selected')
+    setBulkLoading(true)
+    let success = 0
+    for (const id of toVerify) {
+      try {
+        const res = await fetch(`/api/admin/certificates/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'verify' }),
+        })
+        if (res.ok) {
+          success++
+          setCerts(prev => prev.map(c => c.id === id ? { ...c, status: 'VERIFIED', revokedReason: null } : c))
+        }
+      } catch { /* skip */ }
+    }
+    toast.success(`${success} certificate${success > 1 ? 's' : ''} verified`)
+    setSelectedIds(new Set())
+    setBulkLoading(false)
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filtered.map(c => c.id)))
+    }
+  }
+
   function copyVerifyLink(cert: Cert) {
     const url = `${window.location.origin}/verify/${cert.certificateNo}`
     navigator.clipboard.writeText(url).then(() => {
@@ -94,19 +187,12 @@ export default function AdminCertificatesPage() {
     })
   }
 
-  const filtered = certs.filter(c => {
-    const matchFilter = filter === 'ALL' || c.status === filter
-    const q = search.toLowerCase()
-    const matchSearch = !q || c.user.name.toLowerCase().includes(q) || c.course.title.toLowerCase().includes(q) || c.certificateNo.toLowerCase().includes(q)
-    return matchFilter && matchSearch
-  })
-
-  const counts = {
-    ALL: certs.length,
-    PENDING: certs.filter(c => c.status === 'PENDING').length,
-    VERIFIED: certs.filter(c => c.status === 'VERIFIED').length,
-    REVOKED: certs.filter(c => c.status === 'REVOKED').length,
-  }
+  const allSelected = filtered.length > 0 && selectedIds.size === filtered.length
+  const someSelected = selectedIds.size > 0
+  const selectedPendingCount = Array.from(selectedIds).filter(id => {
+    const c = certs.find(x => x.id === id)
+    return c && c.status !== 'VERIFIED'
+  }).length
 
   return (
     <div className="space-y-6">
@@ -119,33 +205,163 @@ export default function AdminCertificatesPage() {
         <p className="text-white/40 mt-1 text-sm">Review and verify student certificates</p>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {(['ALL', 'PENDING', 'VERIFIED', 'REVOKED'] as const).map(s => (
-          <button key={s} onClick={() => setFilter(s)}
-            className={`glass-card p-4 text-left transition-all rounded-2xl border ${
-              filter === s ? 'border-purple-500/40 bg-purple-500/10' : 'border-white/8 hover:border-white/15'
-            }`}>
-            <div className={`text-2xl font-display font-bold ${
-              s === 'VERIFIED' ? 'text-green-400' :
-              s === 'PENDING'  ? 'text-amber-400' :
-              s === 'REVOKED'  ? 'text-red-400'    : 'gradient-text'
-            }`}>{counts[s]}</div>
-            <div className="text-xs text-white/40 mt-0.5">{s === 'ALL' ? 'Total' : s.charAt(0) + s.slice(1).toLowerCase()}</div>
-          </button>
-        ))}
+      {/* Live stats — update with filters */}
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+        <div className="glass-card p-4 md:col-span-1 rounded-2xl border border-white/8">
+          <div className="flex items-center gap-2 mb-1">
+            <BarChart3 className="w-3.5 h-3.5 text-purple-400" />
+            <p className="text-[10px] text-white/40 uppercase tracking-wider">Total</p>
+          </div>
+          <p className="font-display text-2xl font-bold gradient-text">{stats.total}</p>
+          <p className="text-[10px] text-white/30 mt-0.5">{stats.uniqueStudents} students</p>
+        </div>
+        <div className="glass-card p-4 md:col-span-1 rounded-2xl border border-green-500/20 cursor-pointer hover:border-green-500/40 transition-colors"
+          onClick={() => setFilterStatus(filterStatus === 'VERIFIED' ? 'ALL' : 'VERIFIED')}>
+          <div className="flex items-center gap-2 mb-1">
+            <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
+            <p className="text-[10px] text-white/40 uppercase tracking-wider">Verified</p>
+          </div>
+          <p className="font-display text-2xl font-bold text-green-400">{stats.verified}</p>
+          <p className="text-[10px] text-white/30 mt-0.5">{stats.verifyRate}% rate</p>
+        </div>
+        <div className="glass-card p-4 md:col-span-1 rounded-2xl border border-amber-500/20 cursor-pointer hover:border-amber-500/40 transition-colors"
+          onClick={() => setFilterStatus(filterStatus === 'PENDING' ? 'ALL' : 'PENDING')}>
+          <div className="flex items-center gap-2 mb-1">
+            <Clock className="w-3.5 h-3.5 text-amber-400" />
+            <p className="text-[10px] text-white/40 uppercase tracking-wider">Pending</p>
+          </div>
+          <p className="font-display text-2xl font-bold text-amber-400">{stats.pending}</p>
+          <p className="text-[10px] text-white/30 mt-0.5">awaiting review</p>
+        </div>
+        <div className="glass-card p-4 md:col-span-1 rounded-2xl border border-red-500/20 cursor-pointer hover:border-red-500/40 transition-colors"
+          onClick={() => setFilterStatus(filterStatus === 'REVOKED' ? 'ALL' : 'REVOKED')}>
+          <div className="flex items-center gap-2 mb-1">
+            <XCircle className="w-3.5 h-3.5 text-red-400" />
+            <p className="text-[10px] text-white/40 uppercase tracking-wider">Revoked</p>
+          </div>
+          <p className="font-display text-2xl font-bold text-red-400">{stats.revoked}</p>
+          <p className="text-[10px] text-white/30 mt-0.5">invalidated</p>
+        </div>
+        <div className="glass-card p-4 md:col-span-1 rounded-2xl border border-cyan-500/20">
+          <div className="flex items-center gap-2 mb-1">
+            <TrendingUp className="w-3.5 h-3.5 text-cyan-400" />
+            <p className="text-[10px] text-white/40 uppercase tracking-wider">Verify Rate</p>
+          </div>
+          <p className="font-display text-2xl font-bold text-cyan-400">{stats.verifyRate}%</p>
+          <p className="text-[10px] text-white/30 mt-0.5">of filtered</p>
+        </div>
+        <div className="glass-card p-4 md:col-span-1 rounded-2xl border border-white/8">
+          <div className="flex items-center gap-2 mb-1">
+            <PieChart className="w-3.5 h-3.5 text-violet-400" />
+            <p className="text-[10px] text-white/40 uppercase tracking-wider">Showing</p>
+          </div>
+          <p className="font-display text-2xl font-bold text-white/70">{filtered.length}</p>
+          <p className="text-[10px] text-white/30 mt-0.5">of {certs.length} total</p>
+        </div>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
-        <input
-          className="input-field pl-9 text-sm"
-          placeholder="Search by student name, course or certificate ID..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
+      {/* Filters row */}
+      <div className="glass-card p-4 rounded-2xl border border-white/8">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 text-white/40 text-xs shrink-0">
+            <Filter className="w-3.5 h-3.5" /> Filters
+          </div>
+
+          {/* Search */}
+          <div className="relative flex-1 min-w-[180px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30" />
+            <input
+              className="input-field pl-8 py-2 text-sm h-9"
+              placeholder="Search student, course, cert ID..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+
+          {/* Student filter */}
+          <select
+            className="input-field py-2 text-sm h-9 min-w-[150px]"
+            value={filterStudent}
+            onChange={e => setFilterStudent(e.target.value)}
+          >
+            <option value="ALL">All Students</option>
+            {students.map(([id, name]) => (
+              <option key={id} value={id}>{name}</option>
+            ))}
+          </select>
+
+          {/* Course filter */}
+          <select
+            className="input-field py-2 text-sm h-9 min-w-[150px]"
+            value={filterCourse}
+            onChange={e => setFilterCourse(e.target.value)}
+          >
+            <option value="ALL">All Courses</option>
+            {courses.map(([id, title]) => (
+              <option key={id} value={id}>{title}</option>
+            ))}
+          </select>
+
+          {/* Status filter */}
+          <select
+            className="input-field py-2 text-sm h-9"
+            value={filterStatus}
+            onChange={e => setFilterStatus(e.target.value)}
+          >
+            <option value="ALL">All Statuses</option>
+            <option value="PENDING">Pending</option>
+            <option value="VERIFIED">Verified</option>
+            <option value="REVOKED">Revoked</option>
+          </select>
+
+          {/* Sort */}
+          <select
+            className="input-field py-2 text-sm h-9"
+            value={sortBy}
+            onChange={e => setSortBy(e.target.value as typeof sortBy)}
+          >
+            <option value="date-desc">Newest First</option>
+            <option value="date-asc">Oldest First</option>
+            <option value="name-asc">Name A–Z</option>
+            <option value="name-desc">Name Z–A</option>
+          </select>
+
+          {/* Clear filters */}
+          {(search || filterStudent !== 'ALL' || filterCourse !== 'ALL' || filterStatus !== 'ALL') && (
+            <button
+              onClick={() => { setSearch(''); setFilterStudent('ALL'); setFilterCourse('ALL'); setFilterStatus('ALL') }}
+              className="text-xs text-white/40 hover:text-white transition-colors flex items-center gap-1 shrink-0"
+            >
+              <X className="w-3.5 h-3.5" /> Clear
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Bulk action bar */}
+      <AnimatePresence>
+        {someSelected && (
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+            className="flex items-center gap-4 px-5 py-3 rounded-2xl bg-purple-500/10 border border-purple-500/30">
+            <span className="text-sm font-medium text-purple-300">
+              {selectedIds.size} selected
+            </span>
+            <span className="text-white/20">|</span>
+            <button
+              onClick={handleBulkVerify}
+              disabled={bulkLoading || selectedPendingCount === 0}
+              className="flex items-center gap-2 text-sm font-medium text-green-300 hover:text-green-200 disabled:opacity-40 transition-colors"
+            >
+              {bulkLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+              Verify {selectedPendingCount > 0 ? `${selectedPendingCount} selected` : 'selected'}
+            </button>
+            <button onClick={() => setSelectedIds(new Set())}
+              className="ml-auto text-xs text-white/30 hover:text-white transition-colors flex items-center gap-1">
+              <X className="w-3.5 h-3.5" /> Deselect all
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Table */}
       {loading ? (
@@ -161,21 +377,35 @@ export default function AdminCertificatesPage() {
             <table className="w-full text-sm">
               <thead className="border-b border-white/8">
                 <tr className="text-left text-white/40 text-xs">
-                  <th className="px-5 py-3 font-medium">Student</th>
-                  <th className="px-5 py-3 font-medium">Course</th>
-                  <th className="px-5 py-3 font-medium">Issued</th>
-                  <th className="px-5 py-3 font-medium">Status</th>
-                  <th className="px-5 py-3 font-medium">Actions</th>
+                  <th className="px-4 py-3">
+                    <input type="checkbox" checked={allSelected} onChange={toggleSelectAll}
+                      className="rounded border-white/20 bg-white/5 text-purple-500 cursor-pointer" />
+                  </th>
+                  <th className="px-4 py-3 font-medium">Student</th>
+                  <th className="px-4 py-3 font-medium">Course</th>
+                  <th className="px-4 py-3 font-medium">
+                    <button onClick={() => setSortBy(sortBy === 'date-desc' ? 'date-asc' : 'date-desc')}
+                      className="flex items-center gap-1 hover:text-white transition-colors">
+                      Issued <ArrowUpDown className="w-3 h-3" />
+                    </button>
+                  </th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
                 {filtered.map((cert, i) => {
                   const style = STATUS_STYLES[cert.status]
                   const Icon = style.icon
+                  const isSelected = selectedIds.has(cert.id)
                   return (
-                    <motion.tr key={cert.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }}
-                      className="hover:bg-white/2 transition-colors">
-                      <td className="px-5 py-4">
+                    <motion.tr key={cert.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.02 }}
+                      className={`hover:bg-white/2 transition-colors ${isSelected ? 'bg-purple-500/5' : ''}`}>
+                      <td className="px-4 py-4">
+                        <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(cert.id)}
+                          className="rounded border-white/20 bg-white/5 text-purple-500 cursor-pointer" />
+                      </td>
+                      <td className="px-4 py-4">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-cyan-500 flex items-center justify-center text-xs font-bold flex-shrink-0">
                             {cert.user.name[0].toUpperCase()}
@@ -188,14 +418,14 @@ export default function AdminCertificatesPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-4 py-4">
                         <p className="font-medium truncate max-w-[180px]">{cert.course.title}</p>
                         <p className="text-xs text-white/30">{cert.course.category}</p>
                       </td>
-                      <td className="px-5 py-4 text-white/50 text-xs whitespace-nowrap">
+                      <td className="px-4 py-4 text-white/50 text-xs whitespace-nowrap">
                         {new Date(cert.issuedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-4 py-4">
                         <div>
                           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${style.cls}`}>
                             <Icon className={`w-3 h-3 ${style.iconCls}`} />
@@ -208,44 +438,33 @@ export default function AdminCertificatesPage() {
                           )}
                         </div>
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-4 py-4">
                         <div className="flex items-center gap-2">
-                          {/* Copy verify link */}
-                          <button onClick={() => copyVerifyLink(cert)}
-                            title="Copy verification link"
+                          <button onClick={() => copyVerifyLink(cert)} title="Copy verification link"
                             className="p-1.5 rounded-lg hover:bg-white/8 transition-colors text-white/30 hover:text-white">
                             {copied === cert.id ? <CheckCheck className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
                           </button>
-                          {/* Open verify page */}
                           <a href={`/verify/${cert.certificateNo}`} target="_blank" rel="noopener noreferrer"
                             title="Open verification page"
                             className="p-1.5 rounded-lg hover:bg-white/8 transition-colors text-white/30 hover:text-white">
                             <ExternalLink className="w-4 h-4" />
                           </a>
-                          {/* Verify */}
                           {cert.status !== 'VERIFIED' && (
-                            <button
-                              onClick={() => handleVerify(cert)}
-                              disabled={actionLoading === cert.id}
+                            <button onClick={() => handleVerify(cert)} disabled={actionLoading === cert.id}
                               title="Mark as verified"
                               className="p-1.5 rounded-lg hover:bg-green-500/15 transition-colors text-white/30 hover:text-green-400 disabled:opacity-40">
                               {actionLoading === cert.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                             </button>
                           )}
-                          {/* Revoke */}
                           {cert.status !== 'REVOKED' && (
-                            <button
-                              onClick={() => { setRevokeTarget(cert); setRevokeReason('') }}
+                            <button onClick={() => { setRevokeTarget(cert); setRevokeReason('') }}
                               title="Revoke certificate"
                               className="p-1.5 rounded-lg hover:bg-red-500/15 transition-colors text-white/30 hover:text-red-400">
                               <XCircle className="w-4 h-4" />
                             </button>
                           )}
-                          {/* Re-verify (undo revoke) */}
                           {cert.status === 'REVOKED' && (
-                            <button
-                              onClick={() => handleVerify(cert)}
-                              disabled={actionLoading === cert.id}
+                            <button onClick={() => handleVerify(cert)} disabled={actionLoading === cert.id}
                               title="Restore as verified"
                               className="p-1.5 rounded-lg hover:bg-amber-500/15 transition-colors text-white/30 hover:text-amber-400 disabled:opacity-40">
                               <RotateCcw className="w-4 h-4" />
@@ -285,12 +504,10 @@ export default function AdminCertificatesPage() {
                   <X className="w-5 h-5" />
                 </button>
               </div>
-
               <div className="p-3 rounded-xl bg-white/3 border border-white/8 mb-4 text-sm">
                 <p className="font-medium">{revokeTarget.user.name}</p>
                 <p className="text-white/40 text-xs">{revokeTarget.course.title}</p>
               </div>
-
               <div className="mb-5">
                 <label className="text-xs text-white/50 mb-1.5 block">Reason for revocation *</label>
                 <textarea
@@ -301,14 +518,12 @@ export default function AdminCertificatesPage() {
                   autoFocus
                 />
               </div>
-
               <div className="flex gap-3">
                 <button onClick={() => setRevokeTarget(null)}
                   className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm text-white/50 hover:text-white hover:border-white/20 transition-all">
                   Cancel
                 </button>
-                <button
-                  onClick={handleRevoke}
+                <button onClick={handleRevoke}
                   disabled={!revokeReason.trim() || actionLoading === revokeTarget.id}
                   className="flex-1 py-2.5 rounded-xl bg-red-500/20 border border-red-500/30 text-red-300 text-sm font-medium hover:bg-red-500/30 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
                   {actionLoading === revokeTarget.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
