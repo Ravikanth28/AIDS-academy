@@ -10,10 +10,12 @@
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "db:fix-login-points": "tsx prisma/fix-login-points.ts"
+    "db:fix-login-points": "tsx prisma/fix-login-points.ts",
+    "db:fix-all-points": "tsx prisma/fix-all-points.ts"
   },
   "dependencies": {
     "@cerebras/cerebras_cloud_sdk": "^1.19.0",
+    "@monaco-editor/react": "^4.7.0",
     "@prisma/client": "^5.11.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.12.7",

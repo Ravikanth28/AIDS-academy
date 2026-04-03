@@ -129,8 +129,8 @@ export default function AdminCertificatesPage() {
   }, [certs])
 
   const activeFiltersCount = [filterStatus !== 'ALL', filterStudent !== 'ALL', filterCourse !== 'ALL', search !== ''].filter(Boolean).length
-  const filterSelectClassName = 'w-full bg-white/[0.05] border border-white/[0.08] rounded-lg px-3 py-2.5 text-sm text-white/70 focus:outline-none focus:border-purple-500/40 transition-all'
-  const dropdownOptionClassName = 'bg-[#1a1b22] text-white'
+  const filterSelectClassName = 'w-full border border-white/[0.08] rounded-lg px-3 py-2.5 text-sm text-white/70 focus:outline-none focus:border-purple-500/40 transition-all'
+  const dropdownOptionClassName = ''
 
   function exportCertificatesCsv() {
     if (filtered.length === 0) {

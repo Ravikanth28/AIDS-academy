@@ -6,7 +6,8 @@ import Link from 'next/link'
 import toast from 'react-hot-toast'
 import {
   ArrowLeft, PlayCircle, CheckCircle, Lock, ClipboardList, ChevronRight, Loader2, Trophy,
-  Sparkles, FileText, Download, Brain, BookOpen, ExternalLink, Github, Database, FileSpreadsheet, Presentation
+  Sparkles, FileText, Download, Brain, BookOpen, ExternalLink, Github, Database, FileSpreadsheet, Presentation,
+  FlaskConical, Code2
 } from 'lucide-react'
 import VideoPlayer from '@/components/student/VideoPlayer'
 import dynamic from 'next/dynamic'
@@ -35,7 +36,8 @@ interface Module {
   passingScore: number
   questionCount: number
   videos: Video[]
-  _count: { questions: number }
+  _count: { questions: number; codingQuestions: number }
+  codingQuestions: Array<{ mode: string }>
 }
 
 interface ModuleProgress {
@@ -466,21 +468,53 @@ export default function CourseDetailPage() {
                 <h2 className="font-display font-semibold text-base sm:text-lg">
                   Module {selectedModule.order}: {selectedModule.title}
                 </h2>
-                {/* Test button */}
-                {getProgress(selectedModule.id)?.videoCompleted && selectedModule._count.questions > 0 && (
-                  <Link
-                    href={`/dashboard/courses/${courseId}/test/${selectedModule.id}`}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all
-                      ${getProgress(selectedModule.id)?.testPassed
-                        ? 'bg-green-500/20 text-green-300 border border-green-500/30'
-                        : 'btn-primary'}`}
-                  >
-                    <ClipboardList className="w-4 h-4" />
-                    {getProgress(selectedModule.id)?.testPassed ? 'Retake Test' : 'Take Test'}
-                  </Link>
+                {getProgress(selectedModule.id)?.videoCompleted && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Practice Mode — show only if there are practice/both questions, or no coding questions at all (AI fallback) */}
+                    {(() => {
+                      const cqs = selectedModule.codingQuestions ?? []
+                      const hasPractice = cqs.length === 0 || cqs.some(q => q.mode === 'practice' || q.mode === 'both')
+                      return hasPractice ? (
+                        <Link
+                          href={`/dashboard/courses/${courseId}/practice/${selectedModule.id}`}
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all bg-purple-500/15 border border-purple-500/30 text-purple-300 hover:bg-purple-500/25"
+                        >
+                          <BookOpen className="w-3.5 h-3.5" />
+                          Practice Mode
+                        </Link>
+                      ) : null
+                    })()}
+                    {/* Coding Test Mode — show only if there are test/both questions, or no coding questions at all (AI fallback) */}
+                    {(() => {
+                      const cqs = selectedModule.codingQuestions ?? []
+                      const hasTest = cqs.length === 0 || cqs.some(q => q.mode === 'test' || q.mode === 'both')
+                      return hasTest ? (
+                        <Link
+                          href={`/dashboard/courses/${courseId}/coding-test/${selectedModule.id}`}
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/25"
+                        >
+                          <Code2 className="w-3.5 h-3.5" />
+                          Coding Test
+                        </Link>
+                      ) : null
+                    })()}
+                    {/* MCQ Test (existing) */}
+                    {selectedModule._count.questions > 0 && (
+                      <Link
+                        href={`/dashboard/courses/${courseId}/test/${selectedModule.id}`}
+                        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all
+                          ${getProgress(selectedModule.id)?.testPassed
+                            ? 'bg-green-500/20 text-green-300 border border-green-500/30'
+                            : 'btn-primary'}`}
+                      >
+                        <ClipboardList className="w-3.5 h-3.5" />
+                        {getProgress(selectedModule.id)?.testPassed ? 'Retake MCQ Test' : 'MCQ Test'}
+                      </Link>
+                    )}
+                  </div>
                 )}
-                {getProgress(selectedModule.id)?.videoCompleted && selectedModule._count.questions === 0 && (
-                  <span className="text-xs text-white/30 italic">No test questions yet</span>
+                {!getProgress(selectedModule.id)?.videoCompleted && (
+                  <span className="text-xs text-white/30 italic">Watch all videos to unlock tests</span>
                 )}
               </div>
 

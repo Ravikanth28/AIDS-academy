@@ -17,12 +17,14 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  otpSessions     OTPSession[]
-  enrollments     Enrollment[]
-  testAttempts    TestAttempt[]
-  certificates    Certificate[]
-  activityLogs    ActivityLog[]
-  monthlyPoints   MonthlyPoints[]
+  otpSessions      OTPSession[]
+  enrollments      Enrollment[]
+  testAttempts     TestAttempt[]
+  certificates     Certificate[]
+  activityLogs     ActivityLog[]
+  monthlyPoints    MonthlyPoints[]
+  practiceAttempts PracticeAttempt[]
+  codingAttempts   CodingAttempt[]
 }
 
 model ActivityLog {
@@ -97,10 +99,13 @@ model Module {
   questionCount Int      @default(10)
   createdAt     DateTime @default(now())
 
-  videos         Video[]
-  questions      Question[]
-  testAttempts   TestAttempt[]
-  moduleProgress ModuleProgress[]
+  videos           Video[]
+  questions        Question[]
+  testAttempts     TestAttempt[]
+  moduleProgress   ModuleProgress[]
+  practiceAttempts PracticeAttempt[]
+  codingAttempts   CodingAttempt[]
+  codingQuestions  CodingQuestion[]
 }
 
 model Video {
@@ -211,4 +216,58 @@ model Certificate {
   issuedAt      DateTime          @default(now())
 
   @@unique([userId, courseId])
+}
+
+model PracticeAttempt {
+  id                 String   @id @default(cuid())
+  userId             String
+  moduleId           String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module             Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  mcqScore           Float    @default(0)
+  totalMcq           Int      @default(0)
+  correctMcq         Int      @default(0)
+  exercisesCompleted Int      @default(0)
+  totalExercises     Int      @default(0)
+  overallScore       Float    @default(0)
+  completedAt        DateTime @default(now())
+
+  @@index([userId])
+  @@index([moduleId])
+}
+
+model CodingAttempt {
+  id            String   @id @default(cuid())
+  userId        String
+  moduleId      String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module        Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  score         Float    @default(0)
+  totalProblems Int      @default(0)
+  passed        Boolean  @default(false)
+  feedback      String?
+  completedAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([moduleId])
+}
+
+model CodingQuestion {
+  id            String   @id @default(cuid())
+  moduleId      String
+  module        Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  type          String   @default("coding")       // "coding" | "sql"
+  difficulty    String   @default("medium")       // "easy" | "medium" | "hard"
+  mode          String   @default("both")         // "practice" | "test" | "both"
+  title         String
+  description   String
+  examples      String   @default("[]")           // JSON: [{input, output}]
+  constraints   String?
+  starterCode   String   @default("")
+  hints         String   @default("[]")           // JSON: string[]
+  sampleSolution String  @default("")
+  order         Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  @@index([moduleId])
 }
