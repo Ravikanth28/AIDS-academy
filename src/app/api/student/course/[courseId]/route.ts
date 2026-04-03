@@ -30,7 +30,11 @@ export async function GET(req: NextRequest, { params }: { params: { courseId: st
               _count: {
                 select: {
                   questions: { where: { timestamp: null } }, // Only count test questions, not checkpoints
+                  codingQuestions: true,
                 },
+              },
+              codingQuestions: {
+                select: { mode: true },
               },
             },
           },

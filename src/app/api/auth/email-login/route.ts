@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { signToken } from '@/lib/auth'
-import { logActivity, POINTS } from '@/lib/points'
+import { logLoginActivity } from '@/lib/points'
 
 export async function POST(req: NextRequest) {
   try {
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
       name: user.name,
     })
 
-    await logActivity(user.id, 'LOGIN', 'Email & password login', POINTS.LOGIN).catch(() => {})
+    await logLoginActivity(user.id).catch(() => {})
 
     const response = NextResponse.json({
       message: 'Login successful',

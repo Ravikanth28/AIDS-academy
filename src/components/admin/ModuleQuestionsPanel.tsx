@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import {
-  Plus, Trash2, Save, Loader2, Upload, CheckCircle, X, ChevronDown, ChevronUp, Settings, Clock, PlayCircle
+  Plus, Trash2, Save, Loader2, Upload, CheckCircle, X, ChevronDown, ChevronUp, Settings, Clock, PlayCircle,
+  Code2, Database, FlaskConical, BookOpen
 } from 'lucide-react'
 
 interface Option {
@@ -42,6 +43,34 @@ interface VideoItem {
   order: number
 }
 
+interface CodingQuestionForm {
+  type: 'coding' | 'sql'
+  difficulty: 'easy' | 'medium' | 'hard'
+  mode: 'practice' | 'test' | 'both'
+  title: string
+  description: string
+  examples: Array<{ input: string; output: string }>
+  constraints: string
+  starterCode: string
+  hints: string[]
+  sampleSolution: string
+}
+
+interface SavedCodingQuestion {
+  id: string
+  type: string
+  difficulty: string
+  mode: string
+  title: string
+  description: string
+  examples: string
+  constraints: string | null
+  starterCode: string
+  hints: string
+  sampleSolution: string
+  order: number
+}
+
 interface Props {
   moduleId: string
   passingScore: number
@@ -59,6 +88,19 @@ const emptyQuestion = (): QuestionForm => ({
     { text: '', isCorrect: false },
     { text: '', isCorrect: false },
   ],
+})
+
+const emptyCodingQ = (): CodingQuestionForm => ({
+  type: 'coding',
+  difficulty: 'medium',
+  mode: 'both',
+  title: '',
+  description: '',
+  examples: [{ input: '', output: '' }],
+  constraints: '',
+  starterCode: '',
+  hints: [''],
+  sampleSolution: '',
 })
 
 const emptyCheckpoint = (): CheckpointForm => ({
@@ -91,7 +133,13 @@ export default function ModuleQuestionsPanel({ moduleId, passingScore, questionC
   const [existingQs, setExistingQs] = useState<Question[]>([])
   const [loading, setLoading] = useState(false)
   const [loadingExisting, setLoadingExisting] = useState(true)
-  const [tab, setTab] = useState<'manual' | 'bulk' | 'checkpoint' | 'settings'>('manual')
+  const [tab, setTab] = useState<'manual' | 'bulk' | 'checkpoint' | 'coding' | 'settings'>('manual')
+
+  // Coding questions state
+  const [codingQs, setCodingQs] = useState<CodingQuestionForm[]>([emptyCodingQ()])
+  const [existingCodingQs, setExistingCodingQs] = useState<SavedCodingQuestion[]>([])
+  const [expandedCq, setExpandedCq] = useState<number>(0)
+  const [loadingCoding, setLoadingCoding] = useState(false)
   const [bulkCsv, setBulkCsv] = useState('')
   const [settings, setSettings] = useState({ passingScore, questionCount })
   const [savingSettings, setSavingSettings] = useState(false)
@@ -101,7 +149,98 @@ export default function ModuleQuestionsPanel({ moduleId, passingScore, questionC
 
   useEffect(() => {
     fetchExisting()
+    fetchCodingQuestions()
   }, [moduleId])
+
+  async function fetchCodingQuestions() {
+    try {
+      const res = await fetch(`/api/admin/modules/${moduleId}/coding-questions`)
+      const data = await res.json()
+      if (res.ok) setExistingCodingQs(Array.isArray(data) ? data : [])
+    } catch { /* silent */ }
+  }
+
+  function updateCodingQ(idx: number, field: keyof CodingQuestionForm, value: unknown) {
+    const updated = [...codingQs]
+    updated[idx] = { ...updated[idx], [field]: value }
+    setCodingQs(updated)
+  }
+
+  function addCodingExample(idx: number) {
+    const updated = [...codingQs]
+    updated[idx].examples = [...updated[idx].examples, { input: '', output: '' }]
+    setCodingQs(updated)
+  }
+
+  function updateCodingExample(qIdx: number, eIdx: number, field: 'input' | 'output', value: string) {
+    const updated = [...codingQs]
+    updated[qIdx].examples[eIdx] = { ...updated[qIdx].examples[eIdx], [field]: value }
+    setCodingQs(updated)
+  }
+
+  function removeCodingExample(qIdx: number, eIdx: number) {
+    const updated = [...codingQs]
+    updated[qIdx].examples = updated[qIdx].examples.filter((_, i) => i !== eIdx)
+    setCodingQs(updated)
+  }
+
+  function addHint(qIdx: number) {
+    const updated = [...codingQs]
+    updated[qIdx].hints = [...updated[qIdx].hints, '']
+    setCodingQs(updated)
+  }
+
+  function updateHint(qIdx: number, hIdx: number, value: string) {
+    const updated = [...codingQs]
+    updated[qIdx].hints[hIdx] = value
+    setCodingQs(updated)
+  }
+
+  function removeHint(qIdx: number, hIdx: number) {
+    const updated = [...codingQs]
+    updated[qIdx].hints = updated[qIdx].hints.filter((_, i) => i !== hIdx)
+    setCodingQs(updated)
+  }
+
+  async function handleSaveCodingQ() {
+    const valid = codingQs.filter(q => q.title.trim() && q.description.trim())
+    if (valid.length === 0) {
+      return toast.error('Each coding question needs a title and description')
+    }
+    setLoadingCoding(true)
+    try {
+      for (const q of valid) {
+        const res = await fetch(`/api/admin/modules/${moduleId}/coding-questions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(q),
+        })
+        if (!res.ok) throw new Error()
+      }
+      toast.success(`${valid.length} coding question(s) saved!`)
+      setCodingQs([emptyCodingQ()])
+      setExpandedCq(0)
+      fetchCodingQuestions()
+    } catch {
+      toast.error('Failed to save coding questions')
+    } finally {
+      setLoadingCoding(false)
+    }
+  }
+
+  async function handleDeleteCodingQ(questionId: string) {
+    try {
+      await fetch(`/api/admin/modules/${moduleId}/coding-questions`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questionId }),
+      })
+      toast.success('Deleted')
+      fetchCodingQuestions()
+    } catch {
+      toast.error('Failed to delete')
+    }
+  }
 
   async function fetchExisting() {
     setLoadingExisting(true)
@@ -313,6 +452,7 @@ export default function ModuleQuestionsPanel({ moduleId, passingScore, questionC
           { key: 'manual', label: 'Add Manually', icon: Plus },
           { key: 'bulk', label: 'Bulk CSV/Excel', icon: Upload },
           { key: 'checkpoint', label: 'Checkpoint Qs', icon: Clock },
+          { key: 'coding', label: 'Coding Questions', icon: Code2 },
           { key: 'settings', label: 'Test Settings', icon: Settings },
         ].map(({ key, label, icon: Icon }) => (
           <button
@@ -320,10 +460,17 @@ export default function ModuleQuestionsPanel({ moduleId, passingScore, questionC
             onClick={() => setTab(key as typeof tab)}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all
               ${tab === key
-                ? 'bg-cyan-500/20 border border-cyan-500/30 text-cyan-300'
+                ? key === 'coding'
+                  ? 'bg-purple-500/20 border border-purple-500/30 text-purple-300'
+                  : 'bg-cyan-500/20 border border-cyan-500/30 text-cyan-300'
                 : 'bg-white/5 text-white/50 hover:text-white'}`}
           >
             <Icon className="w-4 h-4" /> {label}
+            {key === 'coding' && existingCodingQs.length > 0 && (
+              <span className="ml-1 text-xs bg-purple-500/30 text-purple-200 px-1.5 py-0.5 rounded-full">
+                {existingCodingQs.length}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -559,6 +706,284 @@ export default function ModuleQuestionsPanel({ moduleId, passingScore, questionC
                 </button>
               </div>
             </>
+          )}
+        </div>
+      )}
+
+      {/* ===== CODING QUESTIONS TAB ===== */}
+      {tab === 'coding' && (
+        <div>
+          <div className="glass-card border border-purple-500/20 bg-purple-500/5 p-4 mb-5 text-xs text-white/50">
+            <p className="text-purple-300 font-medium mb-1 flex items-center gap-1.5">
+              <Code2 className="w-3.5 h-3.5" /> Coding &amp; SQL Questions
+            </p>
+            <p>Add hands-on coding or SQL problems for <strong className="text-purple-300">Practice Mode</strong> and <strong className="text-cyan-300">Test Mode</strong>. Choose the mode to control where each problem appears. If no questions are added here, both modes will generate problems with AI from the video transcripts.</p>
+          </div>
+
+          {/* Form to add questions */}
+          {codingQs.map((q, qi) => (
+            <div key={qi} className="glass-card border border-white/8 rounded-xl mb-4 overflow-hidden">
+              <button
+                onClick={() => setExpandedCq(expandedCq === qi ? -1 : qi)}
+                className="w-full flex items-center gap-3 p-4 text-left hover:bg-white/3"
+              >
+                <span className="flex-shrink-0 w-7 h-7 rounded-lg bg-purple-500/20 flex items-center justify-center text-xs font-bold text-purple-300">
+                  {qi + 1}
+                </span>
+                <span className="text-sm flex-1 truncate text-white/70">
+                  {q.title || 'New coding problem...'}
+                </span>
+                <span className={`text-[10px] font-medium px-2 py-0.5 rounded flex-shrink-0
+                  ${q.type === 'sql' ? 'text-emerald-400 bg-emerald-500/10' : 'text-cyan-400 bg-cyan-500/10'}`}>
+                  {q.type.toUpperCase()}
+                </span>
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border flex-shrink-0
+                  ${q.difficulty === 'easy' ? 'text-green-400 border-green-500/30' : q.difficulty === 'medium' ? 'text-amber-400 border-amber-500/30' : 'text-red-400 border-red-500/30'}`}>
+                  {q.difficulty}
+                </span>
+                {expandedCq === qi ? <ChevronUp className="w-4 h-4 text-white/30" /> : <ChevronDown className="w-4 h-4 text-white/30" />}
+              </button>
+
+              {expandedCq === qi && (
+                <div className="border-t border-white/5 p-4 space-y-4">
+                  {/* Row 1: type / difficulty / mode */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-xs text-white/40 mb-1 block">Type</label>
+                      <select
+                        className="input-field text-sm py-2"
+                        value={q.type}
+                        onChange={e => updateCodingQ(qi, 'type', e.target.value as 'coding' | 'sql')}
+                      >
+                        <option value="coding">Coding (Python/JS)</option>
+                        <option value="sql">SQL</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-white/40 mb-1 block">Difficulty</label>
+                      <select
+                        className="input-field text-sm py-2"
+                        value={q.difficulty}
+                        onChange={e => updateCodingQ(qi, 'difficulty', e.target.value as 'easy' | 'medium' | 'hard')}
+                      >
+                        <option value="easy">Easy</option>
+                        <option value="medium">Medium</option>
+                        <option value="hard">Hard</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-white/40 mb-1 block">Mode</label>
+                      <select
+                        className="input-field text-sm py-2"
+                        value={q.mode}
+                        onChange={e => updateCodingQ(qi, 'mode', e.target.value as 'practice' | 'test' | 'both')}
+                      >
+                        <option value="both">Practice &amp; Test</option>
+                        <option value="practice">Practice Only</option>
+                        <option value="test">Test Only</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Title */}
+                  <div>
+                    <label className="text-xs text-white/40 mb-1 block">Problem Title *</label>
+                    <input
+                      className="input-field text-sm"
+                      placeholder="e.g., Reverse a Linked List"
+                      value={q.title}
+                      onChange={e => updateCodingQ(qi, 'title', e.target.value)}
+                    />
+                  </div>
+
+                  {/* Description */}
+                  <div>
+                    <label className="text-xs text-white/40 mb-1 block">Problem Description *</label>
+                    <textarea
+                      className="input-field resize-none text-sm font-mono text-sm"
+                      placeholder="Full problem statement. Include requirements, expected input/output format..."
+                      value={q.description}
+                      rows={4}
+                      onChange={e => updateCodingQ(qi, 'description', e.target.value)}
+                    />
+                  </div>
+
+                  {/* Examples */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs text-white/40">Examples</label>
+                      <button onClick={() => addCodingExample(qi)} className="text-xs text-purple-400 hover:text-purple-300 flex items-center gap-1">
+                        <Plus className="w-3 h-3" /> Add Example
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      {q.examples.map((ex, ei) => (
+                        <div key={ei} className="grid grid-cols-2 gap-2 items-start">
+                          <input
+                            className="input-field text-xs font-mono py-2"
+                            placeholder="Input: e.g., nums=[1,2,3]"
+                            value={ex.input}
+                            onChange={e => updateCodingExample(qi, ei, 'input', e.target.value)}
+                          />
+                          <div className="flex items-center gap-1">
+                            <input
+                              className="input-field text-xs font-mono py-2 flex-1"
+                              placeholder="Output: e.g., [3,2,1]"
+                              value={ex.output}
+                              onChange={e => updateCodingExample(qi, ei, 'output', e.target.value)}
+                            />
+                            {q.examples.length > 1 && (
+                              <button onClick={() => removeCodingExample(qi, ei)} className="text-red-400/50 hover:text-red-400 p-1">
+                                <X className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Constraints */}
+                  <div>
+                    <label className="text-xs text-white/40 mb-1 block">Constraints (optional)</label>
+                    <input
+                      className="input-field text-sm"
+                      placeholder="e.g., O(n) time complexity, 1 ≤ n ≤ 10^4"
+                      value={q.constraints}
+                      onChange={e => updateCodingQ(qi, 'constraints', e.target.value)}
+                    />
+                  </div>
+
+                  {/* Starter Code */}
+                  <div>
+                    <label className="text-xs text-white/40 mb-1 block">Starter Code / Template</label>
+                    <textarea
+                      className="input-field resize-none text-sm font-mono bg-[#0d1117]"
+                      placeholder={q.type === 'sql' ? 'SELECT ...\nFROM ...' : 'def solution(nums):\n    # your code here\n    pass'}
+                      value={q.starterCode}
+                      rows={4}
+                      spellCheck={false}
+                      onChange={e => updateCodingQ(qi, 'starterCode', e.target.value)}
+                    />
+                  </div>
+
+                  {/* Hints (Practice only) */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs text-white/40">Hints <span className="text-white/20">(shown in Practice Mode only)</span></label>
+                      <button onClick={() => addHint(qi)} className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1">
+                        <Plus className="w-3 h-3" /> Add Hint
+                      </button>
+                    </div>
+                    <div className="space-y-1.5">
+                      {q.hints.map((hint, hi) => (
+                        <div key={hi} className="flex items-center gap-2">
+                          <span className="text-xs text-white/20 w-5 flex-shrink-0">#{hi + 1}</span>
+                          <input
+                            className="input-field text-sm flex-1 py-2"
+                            placeholder={`Hint ${hi + 1}`}
+                            value={hint}
+                            onChange={e => updateHint(qi, hi, e.target.value)}
+                          />
+                          {q.hints.length > 1 && (
+                            <button onClick={() => removeHint(qi, hi)} className="text-red-400/50 hover:text-red-400 p-1">
+                              <X className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Sample Solution */}
+                  <div>
+                    <label className="text-xs text-white/40 mb-1 block">Sample Solution <span className="text-white/20">(shown in Practice Mode)</span></label>
+                    <textarea
+                      className="input-field resize-none text-sm font-mono bg-[#0d1117] text-green-300/80"
+                      placeholder="Complete working solution with comments..."
+                      value={q.sampleSolution}
+                      rows={5}
+                      spellCheck={false}
+                      onChange={e => updateCodingQ(qi, 'sampleSolution', e.target.value)}
+                    />
+                  </div>
+
+                  {codingQs.length > 1 && (
+                    <button
+                      onClick={() => setCodingQs(codingQs.filter((_, i) => i !== qi))}
+                      className="text-xs text-red-400/70 hover:text-red-400 flex items-center gap-1"
+                    >
+                      <Trash2 className="w-3 h-3" /> Remove this problem
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => { setCodingQs([...codingQs, emptyCodingQ()]); setExpandedCq(codingQs.length) }}
+              className="btn-secondary flex items-center gap-2 text-sm py-2.5"
+            >
+              <Plus className="w-4 h-4" /> Add Problem
+            </button>
+            <button
+              onClick={handleSaveCodingQ}
+              disabled={loadingCoding}
+              className="btn-primary flex items-center gap-2 text-sm py-2.5"
+            >
+              {loadingCoding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              Save {codingQs.length} Problem{codingQs.length > 1 ? 's' : ''}
+            </button>
+          </div>
+
+          {/* Saved coding questions */}
+          {existingCodingQs.length > 0 && (
+            <div className="mt-6 border-t border-white/5 pt-5">
+              <p className="text-xs text-white/40 mb-3 uppercase tracking-wider">
+                Saved Coding Problems ({existingCodingQs.length})
+              </p>
+              <div className="space-y-2">
+                {existingCodingQs.map((q) => {
+                  let hints: string[] = []
+                  try { hints = JSON.parse(q.hints) } catch { hints = [] }
+                  return (
+                    <div key={q.id} className="flex items-start gap-3 p-3 glass-card rounded-xl">
+                      <div className="flex-shrink-0 mt-0.5">
+                        {q.type === 'sql'
+                          ? <Database className="w-4 h-4 text-emerald-400" />
+                          : <Code2 className="w-4 h-4 text-cyan-400" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <p className="text-sm font-medium truncate">{q.title}</p>
+                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border flex-shrink-0
+                            ${q.difficulty === 'easy' ? 'text-green-400 border-green-500/30 bg-green-500/10' : q.difficulty === 'medium' ? 'text-amber-400 border-amber-500/30 bg-amber-500/10' : 'text-red-400 border-red-500/30 bg-red-500/10'}`}>
+                            {q.difficulty}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] text-white/30">
+                          <span className={q.mode === 'practice' ? 'text-purple-400' : q.mode === 'test' ? 'text-cyan-400' : 'text-white/40'}>
+                            {q.mode === 'both' ? '🔁 Practice & Test' : q.mode === 'practice' ? '📚 Practice Only' : '🧪 Test Only'}
+                          </span>
+                          {hints.filter(Boolean).length > 0 && (
+                            <span>{hints.filter(Boolean).length} hint{hints.filter(Boolean).length > 1 ? 's' : ''}</span>
+                          )}
+                          {q.sampleSolution && <span className="text-green-400/60">has solution</span>}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteCodingQ(q.id)}
+                        className="p-1.5 rounded-lg hover:bg-zinc-500/20 text-white/30 hover:text-zinc-300 transition-colors flex-shrink-0"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
           )}
         </div>
       )}

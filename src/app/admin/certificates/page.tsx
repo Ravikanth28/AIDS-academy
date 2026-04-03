@@ -129,8 +129,8 @@ export default function AdminCertificatesPage() {
   }, [certs])
 
   const activeFiltersCount = [filterStatus !== 'ALL', filterStudent !== 'ALL', filterCourse !== 'ALL', search !== ''].filter(Boolean).length
-  const filterSelectClassName = 'w-full bg-white/[0.05] border border-white/[0.08] rounded-lg px-3 py-2.5 text-sm text-white/70 focus:outline-none focus:border-purple-500/40 transition-all'
-  const dropdownOptionClassName = 'bg-[#1a1b22] text-white'
+  const filterSelectClassName = 'w-full border border-white/[0.08] rounded-lg px-3 py-2.5 text-sm text-white/70 focus:outline-none focus:border-purple-500/40 transition-all'
+  const dropdownOptionClassName = ''
 
   function exportCertificatesCsv() {
     if (filtered.length === 0) {
@@ -573,7 +573,7 @@ export default function AdminCertificatesPage() {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="flex items-center gap-3 px-5 py-3.5 rounded-xl bg-purple-500/[0.08] border border-purple-500/20 backdrop-blur-sm"
+            className="flex flex-wrap items-center gap-3 px-5 py-3.5 rounded-xl bg-purple-500/[0.08] border border-purple-500/20 backdrop-blur-sm"
           >
             <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
               <CheckCheck className="w-4 h-4 text-purple-300" />
@@ -778,14 +778,14 @@ export default function AdminCertificatesPage() {
           </div>
 
           {/* Table footer */}
-          <div className="px-5 py-3 border-t border-white/[0.05] flex items-center justify-between">
+          <div className="px-5 py-3 border-t border-white/[0.05] flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-white/25">
               {someSelected
                 ? `${selectedIds.size} of ${filtered.length} selected`
                 : `${filtered.length} certificate${filtered.length !== 1 ? 's' : ''}`
               }
             </p>
-            <div className="flex items-center gap-3 text-xs text-white/25">
+            <div className="flex flex-wrap items-center gap-3 text-xs text-white/25">
               <span className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-400" /> {stats.verified} verified
               </span>

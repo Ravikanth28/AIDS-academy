@@ -202,9 +202,9 @@ export default function AdminStudentsPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
-          <h1 className="font-display text-3xl font-bold">
+          <h1 className="font-display text-2xl sm:text-3xl font-bold">
             <span className="gradient-text">Students</span>
           </h1>
           <p className="text-white/40 mt-1">{students.length} registered users</p>

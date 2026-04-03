@@ -83,7 +83,7 @@ export default function AdminActivityPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-display text-3xl font-bold flex items-center gap-2">
+          <h1 className="font-display text-2xl sm:text-3xl font-bold flex items-center gap-2">
             <Activity className="w-7 h-7 text-green-400" />
             <span className="gradient-text">Activity Log</span>
           </h1>

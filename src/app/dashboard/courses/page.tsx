@@ -152,7 +152,7 @@ export default function StudentCoursesPage() {
     <div>
       {/* Header */}
       <div className="mb-7">
-        <h1 className="font-display text-3xl font-bold gradient-text">Available Courses</h1>
+        <h1 className="font-display text-2xl sm:text-3xl font-bold gradient-text">Available Courses</h1>
         <p className="text-white/40 mt-1">Enroll in courses and start learning</p>
       </div>
 

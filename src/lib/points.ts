@@ -30,3 +30,26 @@ export async function logActivity(
     })
   }
 }
+
+/**
+ * Award login points at most once per calendar day.
+ * Always logs the LOGIN activity (for activity feed), but only adds
+ * points if no LOGIN activity with points > 0 exists today.
+ */
+export async function logLoginActivity(userId: string) {
+  const now = new Date()
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const endOfDay   = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+
+  const todayLogin = await prisma.activityLog.findFirst({
+    where: {
+      userId,
+      action: 'LOGIN',
+      points: { gt: 0 },
+      createdAt: { gte: startOfDay, lt: endOfDay },
+    },
+  })
+
+  const points = todayLogin ? 0 : POINTS.LOGIN
+  await logActivity(userId, 'LOGIN', 'Login', points)
+}

@@ -72,6 +72,8 @@ export async function POST(req: NextRequest, { params }: { params: { moduleId: s
     const existing = await prisma.moduleProgress.findUnique({
       where: { enrollmentId_moduleId: { enrollmentId: enrollment.id, moduleId: params.moduleId } },
     })
+    // Only award points if this is the FIRST time passing this module
+    const alreadyPassed = existing?.testPassed === true
     if (existing) {
       await prisma.moduleProgress.update({
         where: { enrollmentId_moduleId: { enrollmentId: enrollment.id, moduleId: params.moduleId } },
@@ -90,8 +92,9 @@ export async function POST(req: NextRequest, { params }: { params: { moduleId: s
       })
     }
 
-    // Check if all modules are completed for certificate
-    await logActivity(session!.userId, 'TEST_PASSED', `Passed test for module in course`, POINTS.TEST_PASSED).catch(() => {})
+    if (!alreadyPassed) {
+      await logActivity(session!.userId, 'TEST_PASSED', `Passed test for module in course`, POINTS.TEST_PASSED).catch(() => {})
+    }
 
     const courseModules = await prisma.module.findMany({
       where: { courseId },

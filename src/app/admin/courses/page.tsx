@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   BookOpen, Plus, ChevronRight, Users, PlayCircle, HelpCircle,
   Eye, EyeOff, Trash2, Search, Zap, AlertTriangle, X,
-  CheckSquare, Square, Layers, TrendingUp, Globe,
+  CheckSquare, Square, Layers, TrendingUp, Globe, UserCheck, UserPlus,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -76,6 +76,15 @@ export default function AdminCoursesPage() {
   const [bulkConfirm, setBulkConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
+  // Publish modal state
+  const [publishTarget, setPublishTarget] = useState<Course | null>(null)
+  const [publishMode, setPublishMode] = useState<'everyone' | 'specific'>('everyone')
+  const [students, setStudents] = useState<{ id: string; name: string; phone: string }[]>([])
+  const [studentSearch, setStudentSearch] = useState('')
+  const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set())
+  const [loadingStudents, setLoadingStudents] = useState(false)
+  const [publishing, setPublishing] = useState(false)
+
   useEffect(() => { fetchCourses() }, [])
 
   async function fetchCourses() {
@@ -88,19 +97,75 @@ export default function AdminCoursesPage() {
     }
   }
 
-  async function togglePublish(course: Course) {
+  async function fetchStudents() {
+    setLoadingStudents(true)
+    try {
+      const res = await fetch('/api/admin/students')
+      const data = await res.json()
+      setStudents(data.map((s: { id: string; name: string; phone: string }) => ({ id: s.id, name: s.name, phone: s.phone })))
+    } finally {
+      setLoadingStudents(false)
+    }
+  }
+
+  function openPublishModal(course: Course) {
+    if (course.isPublished) {
+      // Unpublish immediately — no modal needed
+      unpublishCourse(course)
+      return
+    }
+    setPublishTarget(course)
+    setPublishMode('everyone')
+    setSelectedStudents(new Set())
+    setStudentSearch('')
+    if (students.length === 0) fetchStudents()
+  }
+
+  async function unpublishCourse(course: Course) {
     try {
       const res = await fetch(`/api/admin/courses/${course.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...course, isPublished: !course.isPublished }),
+        body: JSON.stringify({ ...course, isPublished: false }),
       })
       if (!res.ok) throw new Error()
-      toast.success(course.isPublished ? 'Course unpublished' : 'Course published!')
+      toast.success('Course unpublished')
       fetchCourses()
     } catch {
-      toast.error('Failed to update')
+      toast.error('Failed to unpublish')
     }
+  }
+
+  async function handlePublish() {
+    if (!publishTarget) return
+    if (publishMode === 'specific' && selectedStudents.size === 0) {
+      toast.error('Select at least one student')
+      return
+    }
+    setPublishing(true)
+    try {
+      const res = await fetch(`/api/admin/courses/${publishTarget.id}/assign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: publishMode,
+          studentIds: publishMode === 'specific' ? [...selectedStudents] : [],
+        }),
+      })
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      toast.success(data.message)
+      setPublishTarget(null)
+      fetchCourses()
+    } catch {
+      toast.error('Failed to publish')
+    } finally {
+      setPublishing(false)
+    }
+  }
+
+  async function togglePublish(course: Course) {
+    openPublishModal(course)
   }
 
   async function deleteCourse(id: string) {
@@ -159,9 +224,9 @@ export default function AdminCoursesPage() {
   return (
     <div className="pb-24">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
         <div>
-          <h1 className="font-display text-3xl font-bold gradient-text">Courses</h1>
+          <h1 className="font-display text-2xl sm:text-3xl font-bold gradient-text">Courses</h1>
           <p className="text-white/40 mt-1">Manage your learning content</p>
         </div>
         <Link href="/admin/courses/new"
@@ -454,6 +519,173 @@ export default function AdminCoursesPage() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+      {/* Publish Modal */}
+      <AnimatePresence>
+        {publishTarget && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"
+            onClick={() => setPublishTarget(null)}
+          >
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              className="glass-card gradient-border w-full max-w-lg overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-white/5">
+                <div>
+                  <h3 className="font-display font-bold text-base">Publish Course</h3>
+                  <p className="text-white/40 text-xs mt-0.5 truncate max-w-72">{publishTarget.title}</p>
+                </div>
+                <button onClick={() => setPublishTarget(null)} className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-all">
+                  <X className="w-4 h-4 text-white/50" />
+                </button>
+              </div>
+
+              {/* Mode toggle */}
+              <div className="px-6 pt-4">
+                <p className="text-xs text-white/40 mb-2 uppercase tracking-wider">Who can access this course?</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setPublishMode('everyone')}
+                    className={`flex flex-col items-center gap-2 p-3 rounded-xl border text-sm font-medium transition-all ${
+                      publishMode === 'everyone'
+                        ? 'border-green-500/50 bg-green-500/10 text-green-300'
+                        : 'border-white/10 bg-white/3 text-white/50 hover:bg-white/8'
+                    }`}
+                  >
+                    <Globe className="w-5 h-5" />
+                    <span>Everyone</span>
+                    <span className="text-[10px] font-normal text-white/30 text-center leading-tight">Publish publicly — students can browse &amp; self-enroll</span>
+                  </button>
+                  <button
+                    onClick={() => { setPublishMode('specific'); if (students.length === 0) fetchStudents() }}
+                    className={`flex flex-col items-center gap-2 p-3 rounded-xl border text-sm font-medium transition-all ${
+                      publishMode === 'specific'
+                        ? 'border-purple-500/50 bg-purple-500/10 text-purple-300'
+                        : 'border-white/10 bg-white/3 text-white/50 hover:bg-white/8'
+                    }`}
+                  >
+                    <UserCheck className="w-5 h-5" />
+                    <span>Specific Students</span>
+                    <span className="text-[10px] font-normal text-white/30 text-center leading-tight">Auto-enroll selected students only</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Student selector (visible only in 'specific' mode) */}
+              {publishMode === 'specific' && (
+                <div className="px-6 pt-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs text-white/40 uppercase tracking-wider">Select Students</p>
+                    {selectedStudents.size > 0 && (
+                      <span className="text-xs text-purple-300 font-medium">{selectedStudents.size} selected</span>
+                    )}
+                  </div>
+
+                  {/* Search */}
+                  <div className="relative mb-2">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30" />
+                    <input
+                      className="input-field text-sm py-2 pl-8"
+                      placeholder="Search students..."
+                      value={studentSearch}
+                      onChange={e => setStudentSearch(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Select all / deselect all */}
+                  {!loadingStudents && students.length > 0 && (
+                    <div className="flex gap-2 mb-2">
+                      <button
+                        onClick={() => {
+                          const visible = students.filter(s =>
+                            s.name.toLowerCase().includes(studentSearch.toLowerCase()) ||
+                            s.phone.includes(studentSearch)
+                          )
+                          setSelectedStudents(prev => {
+                            const n = new Set(prev)
+                            visible.forEach(s => n.add(s.id))
+                            return n
+                          })
+                        }}
+                        className="text-xs text-white/40 hover:text-white transition-colors"
+                      >
+                        Select all
+                      </button>
+                      <span className="text-white/20">·</span>
+                      <button onClick={() => setSelectedStudents(new Set())} className="text-xs text-white/40 hover:text-white transition-colors">
+                        Clear
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Student list */}
+                  <div className="max-h-52 overflow-y-auto rounded-xl border border-white/8 divide-y divide-white/5">
+                    {loadingStudents ? (
+                      <div className="py-6 text-center text-white/30 text-sm">Loading students...</div>
+                    ) : students.length === 0 ? (
+                      <div className="py-6 text-center text-white/30 text-sm">No students found</div>
+                    ) : (
+                      students
+                        .filter(s =>
+                          s.name.toLowerCase().includes(studentSearch.toLowerCase()) ||
+                          s.phone.includes(studentSearch)
+                        )
+                        .map(s => {
+                          const checked = selectedStudents.has(s.id)
+                          return (
+                            <button
+                              key={s.id}
+                              onClick={() => setSelectedStudents(prev => {
+                                const n = new Set(prev)
+                                checked ? n.delete(s.id) : n.add(s.id)
+                                return n
+                              })}
+                              className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all ${
+                                checked ? 'bg-purple-500/10' : 'hover:bg-white/4'
+                              }`}
+                            >
+                              <div className={`w-4 h-4 rounded flex-shrink-0 flex items-center justify-center border transition-all ${
+                                checked ? 'bg-purple-500 border-purple-500' : 'border-white/20'
+                              }`}>
+                                {checked && <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 10 8"><path d="M1 4l3 3 5-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium truncate">{s.name}</p>
+                                <p className="text-xs text-white/30">{s.phone}</p>
+                              </div>
+                            </button>
+                          )
+                        })
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Footer */}
+              <div className="flex gap-3 px-6 py-4 mt-3">
+                <button onClick={() => setPublishTarget(null)} className="flex-1 btn-secondary py-2.5 text-sm">Cancel</button>
+                <button
+                  onClick={handlePublish}
+                  disabled={publishing || (publishMode === 'specific' && selectedStudents.size === 0)}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 ${
+                    publishMode === 'everyone'
+                      ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white'
+                      : 'bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white'
+                  }`}
+                >
+                  {publishing ? (
+                    <><Zap className="w-4 h-4 animate-spin" /> Publishing...</>
+                  ) : publishMode === 'everyone' ? (
+                    <><Globe className="w-4 h-4" /> Publish for Everyone</>
+                  ) : (
+                    <><UserPlus className="w-4 h-4" /> Assign to {selectedStudents.size} Student{selectedStudents.size !== 1 ? 's' : ''}</>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>    </div>
   )
 }
