@@ -231,6 +231,9 @@ export default function CredentialsPage() {
             placeholder="Search by name, email or phone…"
             value={search}
             onChange={e => setSearch(e.target.value)}
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
             className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-9 py-2.5 text-sm focus:outline-none focus:border-purple-500/50 placeholder:text-white/20"
           />
           {search && (
@@ -537,6 +540,7 @@ export default function CredentialsPage() {
                                     value={passwords[student.id] || ''}
                                     onChange={e => setPasswords(p => ({ ...p, [student.id]: e.target.value }))}
                                     onKeyDown={e => e.key === 'Enter' && handleResetPassword(student)}
+                                    autoComplete="new-password"
                                     className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 pr-9 text-xs focus:outline-none focus:border-amber-500/50 placeholder:text-white/15 text-white/80"
                                   />
                                   <button

@@ -210,10 +210,12 @@ export default function VideoPlayer({ video, onWatched, isWatched, checkpoints =
   function handleCheckpointContinue() {
     if (checkpointCorrect) {
       setActiveCheckpoint(null)
-      // Resume video
-      if (playerRef.current) {
-        playerRef.current.playVideo()
-      }
+      // Resume video — small delay ensures player state has settled after pauseVideo()
+      setTimeout(() => {
+        if (playerRef.current) {
+          playerRef.current.playVideo()
+        }
+      }, 150)
     } else {
       // Wrong answer — restart video from beginning, reset all checkpoint progress
       setActiveCheckpoint(null)
@@ -221,10 +223,12 @@ export default function VideoPlayer({ video, onWatched, isWatched, checkpoints =
       setCheckpointAnswered(false)
       answeredCheckpointsRef.current = new Set()
       maxWatchedTimeRef.current = 0
-      if (playerRef.current) {
-        playerRef.current.seekTo(0, true)
-        playerRef.current.playVideo()
-      }
+      setTimeout(() => {
+        if (playerRef.current) {
+          playerRef.current.seekTo(0, true)
+          playerRef.current.playVideo()
+        }
+      }, 150)
     }
   }
 
@@ -247,10 +251,11 @@ export default function VideoPlayer({ video, onWatched, isWatched, checkpoints =
 
         {/* Checkpoint Question Overlay */}
         {activeCheckpoint && (
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-10 p-4">
-            <div className="w-full max-w-lg glass-card border border-purple-500/30 p-6 rounded-2xl">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/75 backdrop-blur-sm flex items-start sm:items-center justify-center z-10 overflow-y-auto">
+            <div className="w-full max-w-lg glass-card border border-purple-500/30 rounded-2xl m-3 sm:m-4 flex flex-col">
+              {/* Header */}
+              <div className="flex items-center gap-2 p-4 pb-0">
+                <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center flex-shrink-0">
                   <Clock className="w-4 h-4 text-purple-400" />
                 </div>
                 <div>
@@ -261,50 +266,54 @@ export default function VideoPlayer({ video, onWatched, isWatched, checkpoints =
                 </div>
               </div>
 
-              <p className="text-sm font-medium mb-3">{activeCheckpoint.text}</p>
+              {/* Scrollable body */}
+              <div className="p-4 overflow-y-auto">
+                <p className="text-sm font-medium mb-3 leading-relaxed">{activeCheckpoint.text}</p>
 
-              <div className="space-y-2">
-                {activeCheckpoint.options.map((opt) => {
-                  let optClass = 'bg-white/5 border-white/10 hover:bg-white/10'
-                  if (checkpointAnswered && opt.isCorrect) {
-                    optClass = 'bg-green-500/20 border-green-500/40 text-green-300'
-                  } else if (checkpointAnswered && selectedOption === opt.id && !opt.isCorrect) {
-                    optClass = 'bg-red-500/20 border-red-500/40 text-red-300'
-                  } else if (selectedOption === opt.id) {
-                    optClass = 'bg-purple-500/20 border-purple-500/40 text-purple-200'
-                  }
-                  return (
-                    <button
-                      key={opt.id}
-                      onClick={() => { if (!checkpointAnswered) setSelectedOption(opt.id) }}
-                      className={`w-full text-left text-sm px-4 py-2.5 rounded-xl border transition-all ${optClass}`}
-                    >
-                      {opt.text}
-                    </button>
-                  )
-                })}
+                <div className="space-y-2">
+                  {activeCheckpoint.options.map((opt) => {
+                    let optClass = 'bg-white/5 border-white/10 hover:bg-white/10'
+                    if (checkpointAnswered && opt.isCorrect) {
+                      optClass = 'bg-green-500/20 border-green-500/40 text-green-300'
+                    } else if (checkpointAnswered && selectedOption === opt.id && !opt.isCorrect) {
+                      optClass = 'bg-red-500/20 border-red-500/40 text-red-300'
+                    } else if (selectedOption === opt.id) {
+                      optClass = 'bg-purple-500/20 border-purple-500/40 text-purple-200'
+                    }
+                    return (
+                      <button
+                        key={opt.id}
+                        onClick={() => { if (!checkpointAnswered) setSelectedOption(opt.id) }}
+                        className={`w-full text-left text-sm px-4 py-3 rounded-xl border transition-all ${optClass}`}
+                      >
+                        {opt.text}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {checkpointAnswered && activeCheckpoint.explanation && (
+                  <p className="text-xs text-cyan-300/70 mt-3 flex items-start gap-1.5">
+                    <Sparkles className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                    {activeCheckpoint.explanation}
+                  </p>
+                )}
               </div>
 
-              {checkpointAnswered && activeCheckpoint.explanation && (
-                <p className="text-xs text-cyan-300/70 mt-3 flex items-start gap-1.5">
-                  <Sparkles className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                  {activeCheckpoint.explanation}
-                </p>
-              )}
-
-              <div className="mt-4">
+              {/* Sticky action button — always visible */}
+              <div className="p-4 pt-0">
                 {!checkpointAnswered ? (
                   <button
                     onClick={handleCheckpointAnswer}
                     disabled={!selectedOption}
-                    className="btn-primary w-full text-sm py-2.5 disabled:opacity-40"
+                    className="btn-primary w-full text-sm py-3 disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     Submit Answer
                   </button>
                 ) : (
                   <button
                     onClick={handleCheckpointContinue}
-                    className={`w-full text-sm py-2.5 rounded-xl font-medium transition-all ${
+                    className={`w-full text-sm py-3 rounded-xl font-medium transition-all ${
                       checkpointCorrect
                         ? 'bg-green-500/20 border border-green-500/30 text-green-300 hover:bg-green-500/30'
                         : 'bg-amber-500/20 border border-amber-500/30 text-amber-300 hover:bg-amber-500/30'
