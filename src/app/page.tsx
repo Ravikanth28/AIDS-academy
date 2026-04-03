@@ -129,24 +129,24 @@ export default function HomePage() {
             Powered by Cerebras AI
           </div>
 
-          <h1 className="font-display text-5xl md:text-7xl font-bold leading-tight mb-6">
+          <h1 className="font-display text-4xl sm:text-5xl md:text-7xl font-bold leading-tight mb-6">
             Master{' '}
             <span className="gradient-text">AI & Data Science</span>
             <br />
             at Your Pace
           </h1>
 
-          <p className="text-xl text-white/60 mb-10 max-w-2xl mx-auto leading-relaxed">
+          <p className="text-base sm:text-xl text-white/60 mb-10 max-w-2xl mx-auto leading-relaxed">
             Learn through structured video modules, test your knowledge with AI-generated MCQs,
             and earn certificates — all on one intelligent platform.
           </p>
 
-          <div className="flex items-center justify-center gap-4 flex-wrap">
-            <Link href="/register" className="btn-primary flex items-center gap-2 text-base px-8 py-4">
+          <div className="flex items-center justify-center gap-3 sm:gap-4 flex-wrap">
+            <Link href="/register" className="btn-primary flex items-center gap-2 text-sm sm:text-base px-5 sm:px-8 py-3 sm:py-4">
               <PlayCircle className="w-5 h-5" />
               Start Learning Free
             </Link>
-            <Link href="/login" className="btn-secondary flex items-center gap-2 text-base px-8 py-4">
+            <Link href="/login" className="btn-secondary flex items-center gap-2 text-sm sm:text-base px-5 sm:px-8 py-3 sm:py-4">
               Sign In
               <ChevronRight className="w-4 h-4" />
             </Link>
@@ -171,7 +171,7 @@ export default function HomePage() {
       <section className="relative z-10 py-24 px-6">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-14">
-            <h2 className="font-display text-4xl font-bold mb-4">
+          <h2 className="font-display text-2xl sm:text-4xl font-bold mb-4">
               Everything You Need to{' '}
               <span className="gradient-text">Succeed</span>
             </h2>
@@ -202,7 +202,7 @@ export default function HomePage() {
       {/* Learning Path Visual */}
       <section className="relative z-10 py-20 px-6">
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="font-display text-4xl font-bold mb-4">
+          <h2 className="font-display text-2xl sm:text-4xl font-bold mb-4">
             Your Learning{' '}
             <span className="gradient-text">Journey</span>
           </h2>
@@ -238,13 +238,13 @@ export default function HomePage() {
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-600/30 to-cyan-600/30 border border-purple-500/30 flex items-center justify-center mx-auto mb-6">
               <Brain className="w-8 h-8 text-purple-300" />
             </div>
-            <h2 className="font-display text-3xl font-bold mb-4">
+            <h2 className="font-display text-2xl sm:text-3xl font-bold mb-4">
               Ready to Begin Your AI Journey?
             </h2>
             <p className="text-white/50 mb-8 text-lg">
               Join the AI·DS Academy — where intelligent learning meets modern technology.
             </p>
-            <Link href="/register" className="btn-primary inline-flex items-center gap-2 text-base px-10 py-4">
+            <Link href="/register" className="btn-primary inline-flex items-center gap-2 text-sm sm:text-base px-6 sm:px-10 py-3 sm:py-4">
               <Sparkles className="w-5 h-5" />
               Register Now — It's Free
             </Link>

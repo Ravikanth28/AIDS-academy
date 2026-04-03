@@ -116,7 +116,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <span className="font-display font-bold text-sm gradient-text">AI·DS Academy</span>
           <div className="w-9" />
         </header>
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-3 sm:p-6">
           <div className="w-full max-w-7xl mx-auto">{children}</div>
         </main>
       </div>

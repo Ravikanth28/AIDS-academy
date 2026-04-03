@@ -159,9 +159,9 @@ export default function AdminCoursesPage() {
   return (
     <div className="pb-24">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
         <div>
-          <h1 className="font-display text-3xl font-bold gradient-text">Courses</h1>
+          <h1 className="font-display text-2xl sm:text-3xl font-bold gradient-text">Courses</h1>
           <p className="text-white/40 mt-1">Manage your learning content</p>
         </div>
         <Link href="/admin/courses/new"

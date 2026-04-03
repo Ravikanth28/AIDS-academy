@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { Download, Loader2, CheckCircle2, XCircle, Clock, ExternalLink } from 'lucide-react'
 import { getPublicAppUrl } from '@/lib/app-url'
 
@@ -12,6 +12,8 @@ interface CertificateCardProps {
   certificateNo: string
   status?: 'PENDING' | 'VERIFIED' | 'REVOKED'
   revokedReason?: string | null
+  autoDownload?: boolean
+  onDownloadDone?: () => void
 }
 
 export default function CertificateCard({
@@ -22,9 +24,18 @@ export default function CertificateCard({
   certificateNo,
   status = 'PENDING',
   revokedReason,
+  autoDownload,
+  onDownloadDone,
 }: CertificateCardProps) {
   const certRef = useRef<HTMLDivElement>(null)
   const [downloading, setDownloading] = useState(false)
+
+  useEffect(() => {
+    if (autoDownload && status === 'VERIFIED') {
+      downloadPDF().then(() => onDownloadDone?.())
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoDownload])
   const verifyUrl = `${getPublicAppUrl()}/verify/${certificateNo}`
 
   const issueDate = new Date(issuedAt)

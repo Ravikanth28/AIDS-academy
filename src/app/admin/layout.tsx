@@ -17,12 +17,14 @@ import {
   Activity,
   Trophy,
   Award,
+  KeyRound,
 } from 'lucide-react'
 
 const navItems = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/courses', label: 'Courses', icon: BookOpen },
   { href: '/admin/students', label: 'Students', icon: Users },
+  { href: '/admin/students/credentials', label: 'Credentials', icon: KeyRound },
   { href: '/admin/certificates', label: 'Certificates', icon: Award },
   { href: '/admin/activity', label: 'Activity Log', icon: Activity },
   { href: '/admin/leaderboard', label: 'Leaderboard', icon: Trophy },
@@ -82,7 +84,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* Nav Items */}
         <nav className="p-4 flex-1 space-y-1 overflow-y-auto">
           {navItems.map((item) => {
-            const active = pathname === item.href || (item.href !== '/admin' && pathname?.startsWith(item.href))
+            const active = pathname === item.href ||
+              (item.href !== '/admin' &&
+               item.href !== '/admin/students' &&
+               pathname?.startsWith(item.href)) ||
+              (item.href === '/admin/students' &&
+               (pathname === '/admin/students' || (pathname?.startsWith('/admin/students/') && !pathname?.startsWith('/admin/students/credentials'))))
             return (
               <Link
                 key={item.href}
@@ -138,7 +145,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="w-9" />
         </header>
 
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-3 sm:p-6">
           <div className="w-full max-w-7xl mx-auto">{children}</div>
         </main>
       </div>

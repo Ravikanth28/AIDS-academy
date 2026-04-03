@@ -152,7 +152,7 @@ export default function ProfilePage() {
         </div>
 
         {/* Stats */}
-        <div className="relative grid grid-cols-3 gap-3 mt-6">
+        <div className="relative grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6">
           {[
             { icon: BookOpen, val: enrollCount, label: 'Enrolled', sub: 'courses', color: 'text-purple-400 bg-purple-500/10 border-purple-500/15' },
             { icon: CheckCircle, val: certCount, label: 'Certificates', sub: 'earned', color: 'text-amber-400 bg-amber-500/10 border-amber-500/15' },

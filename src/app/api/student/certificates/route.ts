@@ -9,7 +9,6 @@ export async function GET(req: NextRequest) {
   const certificates = await prisma.certificate.findMany({
     where: {
       userId: session!.userId,
-      status: 'VERIFIED',
     },
     include: {
       course: {

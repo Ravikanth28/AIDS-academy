@@ -338,10 +338,10 @@ export default function CourseDetailPage() {
         </div>
       )}
 
-      <div className="flex gap-6">
+      <div className="flex flex-col lg:flex-row gap-6">
         {/* Module List - Left Sidebar */}
-        <div className="w-72 xl:w-80 flex-shrink-0">
-          <div className="sticky top-6">
+        <div className="w-full lg:w-72 xl:w-80 flex-shrink-0">
+          <div className="lg:sticky lg:top-6">
             <h2 className="font-display font-semibold mb-3 text-white/70 text-sm uppercase tracking-wider">Modules</h2>
             <div className="space-y-2">
               {enrollment.course.modules.sort((a, b) => a.order - b.order).map((mod) => {
@@ -462,8 +462,8 @@ export default function CourseDetailPage() {
         <div className="flex-1 min-w-0">
           {selectedModule ? (
             <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-display font-semibold text-lg">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                <h2 className="font-display font-semibold text-base sm:text-lg">
                   Module {selectedModule.order}: {selectedModule.title}
                 </h2>
                 {/* Test button */}

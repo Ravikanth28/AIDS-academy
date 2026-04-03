@@ -178,7 +178,7 @@ export default function AdminDashboard() {
               <Sparkles className="w-4 h-4 text-purple-400" />
               <span className="badge-purple text-xs">Admin Dashboard</span>
             </div>
-            <h1 className="font-display text-3xl font-bold">
+            <h1 className="font-display text-2xl sm:text-3xl font-bold">
               Welcome, <span className="gradient-text">Admin</span> 👋
             </h1>
             <p className="text-white/40 mt-1.5 text-sm">Manage courses, students & track live activity</p>
@@ -217,7 +217,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { href: '/admin/courses/new', icon: BookOpen,  color: 'purple', label: 'Create Course',   sub: 'Add a new course'         },
           { href: '/admin/courses',     icon: PlayCircle, color: 'cyan',   label: 'Manage Videos',   sub: 'Upload & organise links'   },
