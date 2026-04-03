@@ -9,7 +9,8 @@
     "start": "next start",
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "db:fix-login-points": "tsx prisma/fix-login-points.ts"
   },
   "dependencies": {
     "@cerebras/cerebras_cloud_sdk": "^1.19.0",

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { signToken } from '@/lib/auth'
-import { logActivity, POINTS } from '@/lib/points'
+import { logActivity, logLoginActivity, POINTS } from '@/lib/points'
 
 export async function POST(req: NextRequest) {
   try {
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
 
     // Log login activity (but not on register)
     if (action !== 'register') {
-      await logActivity(user.id, 'LOGIN', 'Phone OTP login', POINTS.LOGIN).catch(() => {})
+      await logLoginActivity(user.id).catch(() => {})
     }
 
     const response = NextResponse.json({
