@@ -44,6 +44,8 @@ export default function AdminCertificatesPage() {
   const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'name-asc' | 'name-desc'>('date-desc')
   const [revokeTarget, setRevokeTarget] = useState<Cert | null>(null)
   const [revokeReason, setRevokeReason] = useState('')
+  const [bulkRevokeOpen, setBulkRevokeOpen] = useState(false)
+  const [bulkRevokeReason, setBulkRevokeReason] = useState('')
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [bulkLoading, setBulkLoading] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
@@ -130,6 +132,55 @@ export default function AdminCertificatesPage() {
   const filterSelectClassName = 'w-full bg-white/[0.05] border border-white/[0.08] rounded-lg px-3 py-2.5 text-sm text-white/70 focus:outline-none focus:border-purple-500/40 transition-all'
   const dropdownOptionClassName = 'bg-[#1a1b22] text-white'
 
+  function exportCertificatesCsv() {
+    if (filtered.length === 0) {
+      toast.error('No certificates to export')
+      return
+    }
+
+    const headers = [
+      'Student Name',
+      'Phone',
+      'Course',
+      'Category',
+      'Certificate No',
+      'Status',
+      'Issued At',
+      'Revoked Reason',
+      'Verification URL',
+    ]
+
+    const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`
+
+    const rows = filtered.map(cert => [
+      cert.user.name,
+      cert.user.phone,
+      cert.course.title,
+      cert.course.category,
+      cert.certificateNo,
+      cert.status,
+      new Date(cert.issuedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+      cert.revokedReason || '',
+      `${getPublicAppUrl()}/verify/${cert.certificateNo}`,
+    ])
+
+    const csv = [headers, ...rows]
+      .map(row => row.map(cell => escapeCsv(String(cell))).join(','))
+      .join('\n')
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    const dateStamp = new Date().toISOString().slice(0, 10)
+
+    link.href = url
+    link.download = `certificates-${dateStamp}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+
+    toast.success(`Exported ${filtered.length} certificate${filtered.length !== 1 ? 's' : ''}`)
+  }
+
   async function handleVerify(cert: Cert) {
     setActionLoading(cert.id)
     try {
@@ -193,6 +244,36 @@ export default function AdminCertificatesPage() {
     setBulkLoading(false)
   }
 
+  async function handleBulkRevoke() {
+    const reason = bulkRevokeReason.trim()
+    const ids = Array.from(selectedIds)
+    const toRevoke = ids.filter(id => certs.find(c => c.id === id)?.status !== 'REVOKED')
+    if (!reason) return toast.error('Revocation reason is required')
+    if (toRevoke.length === 0) return toast.error('No active certificates selected')
+
+    setBulkLoading(true)
+    let success = 0
+    for (const id of toRevoke) {
+      try {
+        const res = await fetch(`/api/admin/certificates/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'revoke', reason }),
+        })
+        if (res.ok) {
+          success++
+          setCerts(prev => prev.map(c => c.id === id ? { ...c, status: 'REVOKED', revokedReason: reason } : c))
+        }
+      } catch { /* skip */ }
+    }
+
+    toast.success(`${success} certificate${success > 1 ? 's' : ''} revoked`)
+    setSelectedIds(new Set())
+    setBulkRevokeOpen(false)
+    setBulkRevokeReason('')
+    setBulkLoading(false)
+  }
+
   function toggleSelect(id: string) {
     setSelectedIds(prev => {
       const next = new Set(prev)
@@ -227,6 +308,10 @@ export default function AdminCertificatesPage() {
     const c = certs.find(x => x.id === id)
     return c && c.status !== 'VERIFIED'
   }).length
+  const selectedRevokableCount = Array.from(selectedIds).filter(id => {
+    const c = certs.find(x => x.id === id)
+    return c && c.status !== 'REVOKED'
+  }).length
 
   return (
     <div className="space-y-6">
@@ -248,14 +333,24 @@ export default function AdminCertificatesPage() {
             </div>
           </h1>
         </div>
-        <button
-          onClick={fetchCerts}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm text-white/60 hover:text-white hover:border-white/20 transition-all disabled:opacity-40 self-start"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-3 self-start">
+          <button
+            onClick={exportCertificatesCsv}
+            disabled={loading || filtered.length === 0}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-sm text-emerald-300 hover:bg-emerald-500/15 hover:border-emerald-500/30 transition-all disabled:opacity-40"
+          >
+            <FileText className="w-4 h-4" />
+            Export CSV
+          </button>
+          <button
+            onClick={fetchCerts}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm text-white/60 hover:text-white hover:border-white/20 transition-all disabled:opacity-40"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* ── Statistics Overview ── */}
@@ -494,6 +589,14 @@ export default function AdminCertificatesPage() {
             >
               {bulkLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
               Verify {selectedPendingCount > 0 ? selectedPendingCount : ''} Selected
+            </button>
+            <button
+              onClick={() => { setBulkRevokeOpen(true); setBulkRevokeReason('') }}
+              disabled={bulkLoading || selectedRevokableCount === 0}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500/15 border border-red-500/25 text-sm font-medium text-red-300 hover:bg-red-500/25 disabled:opacity-30 transition-all"
+            >
+              <XCircle className="w-3.5 h-3.5" />
+              Revoke {selectedRevokableCount > 0 ? selectedRevokableCount : ''} Selected
             </button>
             <button onClick={() => setSelectedIds(new Set())}
               className="ml-auto text-xs text-white/30 hover:text-white/60 transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-white/5">
@@ -772,6 +875,85 @@ export default function AdminCertificatesPage() {
                   className="flex-1 py-3 rounded-xl bg-red-500/15 border border-red-500/25 text-red-300 text-sm font-semibold hover:bg-red-500/25 transition-all disabled:opacity-30 flex items-center justify-center gap-2">
                   {actionLoading === revokeTarget.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
                   Revoke Certificate
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {bulkRevokeOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4"
+            onClick={() => setBulkRevokeOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 10 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="bg-[#0c0c14] border border-red-500/20 p-0 rounded-2xl w-full max-w-md shadow-2xl shadow-red-500/5 overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="px-6 pt-6 pb-4 border-b border-white/[0.06]">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+                      <XCircle className="w-5 h-5 text-red-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-display font-bold text-lg">Bulk Revoke Certificates</h3>
+                      <p className="text-xs text-white/35 mt-0.5">This will revoke {selectedRevokableCount} selected certificate{selectedRevokableCount !== 1 ? 's' : ''}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setBulkRevokeOpen(false)}
+                    className="p-2 rounded-lg hover:bg-white/5 text-white/30 hover:text-white transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="px-6 py-5 space-y-5">
+                <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                  <p className="text-sm text-white/75">
+                    Selected certificates from multiple students/courses will be marked as revoked with the same reason.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-xs text-white/45 font-medium mb-2 block">
+                    Reason for revocation <span className="text-red-400">*</span>
+                  </label>
+                  <textarea
+                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-red-500/40 focus:bg-white/[0.06] transition-all duration-200 resize-none h-28"
+                    placeholder="e.g. Fraudulent submissions, batch verification error, policy violation..."
+                    value={bulkRevokeReason}
+                    onChange={e => setBulkRevokeReason(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <div className="px-6 pb-6 flex gap-3">
+                <button
+                  onClick={() => setBulkRevokeOpen(false)}
+                  className="flex-1 py-3 rounded-xl border border-white/[0.08] text-sm text-white/50 font-medium hover:text-white hover:bg-white/[0.04] hover:border-white/15 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleBulkRevoke}
+                  disabled={!bulkRevokeReason.trim() || bulkLoading || selectedRevokableCount === 0}
+                  className="flex-1 py-3 rounded-xl bg-red-500/15 border border-red-500/25 text-red-300 text-sm font-semibold hover:bg-red-500/25 transition-all disabled:opacity-30 flex items-center justify-center gap-2"
+                >
+                  {bulkLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
+                  Revoke Selected
                 </button>
               </div>
             </motion.div>

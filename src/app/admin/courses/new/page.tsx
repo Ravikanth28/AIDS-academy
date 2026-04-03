@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { Brain, BookOpen, ArrowLeft, Plus, Minus, Loader2 } from 'lucide-react'
+import { Brain, BookOpen, ArrowLeft, Plus, Minus, Loader2, Upload, Image as ImageIcon } from 'lucide-react'
 import Link from 'next/link'
 
 export default function NewCoursePage() {
@@ -34,6 +34,33 @@ export default function NewCoursePage() {
       updated[index] = value
       return updated
     })
+  }
+
+  function handleThumbnailUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png']
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Please upload a JPG, JPEG, or PNG image')
+      e.target.value = ''
+      return
+    }
+
+    const maxSizeBytes = 2 * 1024 * 1024
+    if (file.size > maxSizeBytes) {
+      toast.error('Image must be smaller than 2MB')
+      e.target.value = ''
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : ''
+      setForm(prev => ({ ...prev, thumbnail: result }))
+    }
+    reader.onerror = () => toast.error('Failed to read image file')
+    reader.readAsDataURL(file)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -108,13 +135,45 @@ export default function NewCoursePage() {
           </div>
 
           <div>
-            <label className="text-sm text-white/60 mb-2 block">Thumbnail URL (optional)</label>
-            <input
-              className="input-field"
-              placeholder="https://img.youtube.com/vi/VIDEO_ID/maxresdefault.jpg"
-              value={form.thumbnail}
-              onChange={(e) => setForm({ ...form, thumbnail: e.target.value })}
-            />
+            <label className="text-sm text-white/60 mb-2 block">Thumbnail Image (optional)</label>
+            <label className="block cursor-pointer">
+              <input
+                type="file"
+                accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                className="hidden"
+                onChange={handleThumbnailUpload}
+              />
+              <div className="input-field min-h-[88px] flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-11 h-11 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0 overflow-hidden">
+                    {form.thumbnail ? (
+                      <img src={form.thumbnail} alt="Thumbnail preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <ImageIcon className="w-5 h-5 text-white/30" />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm text-white/80">
+                      {form.thumbnail ? 'Thumbnail selected' : 'Upload JPG, JPEG, or PNG'}
+                    </p>
+                    <p className="text-xs text-white/30 mt-1">Max 2MB. Used as the course cover image.</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white/70 shrink-0">
+                  <Upload className="w-4 h-4" />
+                  Choose File
+                </div>
+              </div>
+            </label>
+            {form.thumbnail && (
+              <button
+                type="button"
+                onClick={() => setForm(prev => ({ ...prev, thumbnail: '' }))}
+                className="mt-2 text-xs text-red-300 hover:text-red-200 transition-colors"
+              >
+                Remove thumbnail
+              </button>
+            )}
           </div>
 
           <div>

@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import {
@@ -22,13 +22,20 @@ interface Student {
   certificates: Array<{ id: string; course: { id: string; title: string } }>
 }
 
+interface CourseOption {
+  id: string
+  title: string
+}
+
 type SortKey = 'name' | 'joined' | 'progress' | 'courses'
 type SortDir = 'asc' | 'desc'
 type CertFilter = 'all' | 'with-cert' | 'no-cert'
 type EnrollFilter = 'all' | 'enrolled' | 'not-enrolled'
+type StudentStatusFilter = 'all' | 'completed' | 'in-progress' | 'not-started'
 
 export default function AdminStudentsPage() {
   const [students, setStudents] = useState<Student[]>([])
+  const [courses, setCourses] = useState<CourseOption[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [showRegister, setShowRegister] = useState(false)
@@ -37,6 +44,8 @@ export default function AdminStudentsPage() {
 
   const [certFilter, setCertFilter] = useState<CertFilter>('all')
   const [enrollFilter, setEnrollFilter] = useState<EnrollFilter>('all')
+  const [courseFilter, setCourseFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState<StudentStatusFilter>('all')
   const [sortKey, setSortKey] = useState<SortKey>('joined')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
 
@@ -52,7 +61,22 @@ export default function AdminStudentsPage() {
       .then((data) => { setStudents(data); setLoading(false) })
   }
 
-  useEffect(() => { fetchStudents() }, [])
+  function fetchCourses() {
+    fetch('/api/admin/courses')
+      .then((r) => r.json())
+      .then((data) => {
+        const nextCourses = Array.isArray(data)
+          ? data.map((course: { id: string; title: string }) => ({ id: course.id, title: course.title }))
+          : []
+        setCourses(nextCourses)
+      })
+      .catch(() => setCourses([]))
+  }
+
+  useEffect(() => {
+    fetchStudents()
+    fetchCourses()
+  }, [])
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -73,14 +97,45 @@ export default function AdminStudentsPage() {
     return Array.from(new Set(student.enrollments.map(enrollment => enrollment.course.title))).sort((a, b) => a.localeCompare(b))
   }
 
-  const filtered = students
+  function hasCourseEnrollment(student: Student, courseId: string) {
+    return student.enrollments.some(enrollment => enrollment.course.id === courseId)
+  }
+
+  function hasCourseCertificate(student: Student, courseId: string) {
+    return student.certificates.some(certificate => certificate.course.id === courseId)
+  }
+
+  function getStudentStatus(student: Student, courseId: string) {
+    if (courseId !== 'all') {
+      if (hasCourseCertificate(student, courseId)) return 'completed'
+      if (hasCourseEnrollment(student, courseId)) return 'in-progress'
+      return 'not-started'
+    }
+
+    if (student.certificates.length > 0) return 'completed'
+    if (student.enrollments.length > 0) return 'in-progress'
+    return 'not-started'
+  }
+
+  function getRelevantEnrollments(student: Student) {
+    return courseFilter === 'all'
+      ? student.enrollments
+      : student.enrollments.filter(enrollment => enrollment.course.id === courseFilter)
+  }
+
+  const filtered = useMemo(() => students
     .filter(s =>
       s.name.toLowerCase().includes(search.toLowerCase()) ||
       s.phone.includes(search) ||
       (s.email || '').toLowerCase().includes(search.toLowerCase())
     )
     .filter(s => certFilter === 'all' ? true : certFilter === 'with-cert' ? s.certificates.length > 0 : s.certificates.length === 0)
-    .filter(s => enrollFilter === 'all' ? true : enrollFilter === 'enrolled' ? s.enrollments.length > 0 : s.enrollments.length === 0)
+    .filter(s => {
+      if (enrollFilter === 'all') return true
+      if (courseFilter === 'all') return enrollFilter === 'enrolled' ? s.enrollments.length > 0 : s.enrollments.length === 0
+      return enrollFilter === 'enrolled' ? hasCourseEnrollment(s, courseFilter) : !hasCourseEnrollment(s, courseFilter)
+    })
+    .filter(s => statusFilter === 'all' ? true : getStudentStatus(s, courseFilter) === statusFilter)
     .sort((a, b) => {
       let av = 0, bv = 0
       if (sortKey === 'name') return sortDir === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)
@@ -88,7 +143,7 @@ export default function AdminStudentsPage() {
       if (sortKey === 'progress') { av = getProgress(a); bv = getProgress(b) }
       if (sortKey === 'courses') { av = a.enrollments.length; bv = b.enrollments.length }
       return sortDir === 'asc' ? av - bv : bv - av
-    })
+    }), [students, search, certFilter, enrollFilter, courseFilter, statusFilter, sortKey, sortDir])
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault()
@@ -124,6 +179,26 @@ export default function AdminStudentsPage() {
 
   const totalCerts = students.reduce((a, s) => a + s.certificates.length, 0)
   const totalEnrolled = students.filter(s => s.enrollments.length > 0).length
+  const activeFilterCount = [certFilter !== 'all', enrollFilter !== 'all', courseFilter !== 'all', statusFilter !== 'all', search !== ''].filter(Boolean).length
+  const selectedCourseLabel = courseFilter === 'all'
+    ? 'All Courses'
+    : courses.find(course => course.id === courseFilter)?.title || 'Selected Course'
+
+  const filteredAnalytics = useMemo(() => {
+    const enrolledCount = students.filter(student => (
+      courseFilter === 'all' ? student.enrollments.length > 0 : hasCourseEnrollment(student, courseFilter)
+    )).length
+    const completedCount = students.filter(student => getStudentStatus(student, courseFilter) === 'completed').length
+    const inProgressCount = students.filter(student => getStudentStatus(student, courseFilter) === 'in-progress').length
+
+    return {
+      total: students.length,
+      enrolledCount,
+      notEnrolledCount: students.length - enrolledCount,
+      completedCount,
+      inProgressCount,
+    }
+  }, [students, courseFilter])
 
   return (
     <div>
@@ -163,6 +238,31 @@ export default function AdminStudentsPage() {
         ))}
       </div>
 
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {[
+          { label: 'Scope', value: filteredAnalytics.total, sub: selectedCourseLabel, icon: Users, color: 'purple' },
+          { label: 'Enrolled', value: filteredAnalytics.enrolledCount, sub: `${filteredAnalytics.notEnrolledCount} not enrolled`, icon: BookOpen, color: 'cyan' },
+          { label: 'Completed', value: filteredAnalytics.completedCount, sub: 'Certificate earned', icon: Award, color: 'amber' },
+          { label: 'In Progress', value: filteredAnalytics.inProgressCount, sub: 'Started, not completed', icon: TrendingUp, color: 'pink' },
+        ].map(stat => (
+          <div key={stat.label} className="glass-card p-4 flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+              stat.color === 'purple' ? 'bg-purple-500/20 text-purple-400' :
+              stat.color === 'cyan' ? 'bg-cyan-500/20 text-cyan-400' :
+              stat.color === 'amber' ? 'bg-amber-500/20 text-amber-400' :
+              'bg-pink-500/20 text-pink-400'
+            }`}>
+              <stat.icon className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xl font-bold">{stat.value}</div>
+              <div className="text-xs text-white/40">{stat.label}</div>
+              <div className="text-[11px] text-white/25 mt-0.5">{stat.sub}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
       <div className="glass-card p-4 mb-4">
         <div className="flex gap-3 flex-wrap">
           <div className="relative flex-1 min-w-48">
@@ -177,22 +277,22 @@ export default function AdminStudentsPage() {
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all border ${
-              showFilters || certFilter !== 'all' || enrollFilter !== 'all'
+              showFilters || activeFilterCount > 0
                 ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
                 : 'bg-white/5 text-white/50 border-white/10 hover:bg-white/10'
             }`}
           >
             <Filter className="w-4 h-4" />
             Filters
-            {(certFilter !== 'all' || enrollFilter !== 'all') && (
+            {activeFilterCount > 0 && (
               <span className="w-4 h-4 bg-purple-500 rounded-full text-white text-xs flex items-center justify-center">
-                {(certFilter !== 'all' ? 1 : 0) + (enrollFilter !== 'all' ? 1 : 0)}
+                {activeFilterCount}
               </span>
             )}
           </button>
-          {(certFilter !== 'all' || enrollFilter !== 'all' || search) && (
+          {activeFilterCount > 0 && (
             <button
-              onClick={() => { setCertFilter('all'); setEnrollFilter('all'); setSearch('') }}
+              onClick={() => { setCertFilter('all'); setEnrollFilter('all'); setCourseFilter('all'); setStatusFilter('all'); setSearch('') }}
               className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm text-zinc-400 hover:bg-zinc-500/10 transition-all border border-zinc-500/20"
             >
               <X className="w-3.5 h-3.5" /> Clear
@@ -201,7 +301,20 @@ export default function AdminStudentsPage() {
         </div>
 
         {showFilters && (
-          <div className="mt-4 pt-4 border-t border-white/5 flex flex-wrap gap-6">
+          <div className="mt-4 pt-4 border-t border-white/5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div>
+              <p className="text-xs text-white/40 mb-2 uppercase tracking-wider">Course</p>
+              <select
+                value={courseFilter}
+                onChange={(e) => setCourseFilter(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white/70 focus:outline-none focus:border-purple-500/40"
+              >
+                <option value="all">All Courses</option>
+                {courses.map(course => (
+                  <option key={course.id} value={course.id}>{course.title}</option>
+                ))}
+              </select>
+            </div>
             <div>
               <p className="text-xs text-white/40 mb-2 uppercase tracking-wider">Certificate</p>
               <div className="flex gap-2">
@@ -226,6 +339,25 @@ export default function AdminStudentsPage() {
                     }`}
                   >
                     {f === 'all' ? 'All' : f === 'enrolled' ? '📚 Enrolled' : 'Not Started'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="text-xs text-white/40 mb-2 uppercase tracking-wider">Status</p>
+              <div className="flex gap-2 flex-wrap">
+                {([
+                  ['all', 'All'],
+                  ['completed', 'Completed'],
+                  ['in-progress', 'In Progress'],
+                  ['not-started', 'Not Started'],
+                ] as Array<[StudentStatusFilter, string]>).map(([value, label]) => (
+                  <button key={value} onClick={() => setStatusFilter(value)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      statusFilter === value ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'bg-white/5 text-white/40 hover:bg-white/10'
+                    }`}
+                  >
+                    {label}
                   </button>
                 ))}
               </div>
@@ -280,11 +412,18 @@ export default function AdminStudentsPage() {
               </thead>
               <tbody className="divide-y divide-white/5">
                 {filtered.map((student) => {
-                  const totalModules = student.enrollments.reduce((a, e) => a + e.moduleProgress.length, 0)
-                  const doneMods = student.enrollments.reduce((a, e) => a + e.moduleProgress.filter(p => p.testPassed).length, 0)
+                  const relevantEnrollments = getRelevantEnrollments(student)
+                  const totalModules = relevantEnrollments.reduce((a, e) => a + e.moduleProgress.length, 0)
+                  const doneMods = relevantEnrollments.reduce((a, e) => a + e.moduleProgress.filter(p => p.testPassed).length, 0)
                   const pct = totalModules === 0 ? 0 : Math.round((doneMods / totalModules) * 100)
-                  const completedCourseTitles = getCompletedCourseTitles(student)
-                  const enrolledCourseTitles = getEnrolledCourseTitles(student)
+                  const completedCourseTitles = courseFilter === 'all'
+                    ? getCompletedCourseTitles(student)
+                    : student.certificates
+                      .filter(cert => cert.course.id === courseFilter)
+                      .map(cert => cert.course.title)
+                  const enrolledCourseTitles = courseFilter === 'all'
+                    ? getEnrolledCourseTitles(student)
+                    : relevantEnrollments.map(enrollment => enrollment.course.title)
                   const fallbackCourseTitles = enrolledCourseTitles.filter(title => !completedCourseTitles.includes(title))
                   const displayedCourseTitles = completedCourseTitles.length > 0 ? completedCourseTitles : fallbackCourseTitles
                   const courseCaption = completedCourseTitles.length > 0

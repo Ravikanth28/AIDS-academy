@@ -120,6 +120,11 @@ export default function VideoPlayer({ video, onWatched, isWatched, checkpoints =
           rel: 0,
           modestbranding: 1,
           enablejsapi: 1,
+          origin: window.location.origin,
+          playsinline: 1,
+          fs: 0,
+          iv_load_policy: 3,
+          cc_load_policy: 0,
           disablekb: 1, // Disable keyboard controls (arrow keys to seek)
           controls: 0,  // Hide YouTube controls (removes gear/settings icon)
         },
