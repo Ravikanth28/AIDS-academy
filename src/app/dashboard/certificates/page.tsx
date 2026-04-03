@@ -94,11 +94,15 @@ export default function CertificatesPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5 mb-6">
             {certs.map((cert, i) => {
               const isOpen = selected === cert.id
+              const canViewCertificate = cert.status === 'VERIFIED'
               const grad = getCertGradient(cert.course.category)
               return (
                 <motion.div key={cert.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}>
                   <button
-                    onClick={() => setSelected(isOpen ? null : cert.id)}
+                    onClick={() => {
+                      if (!canViewCertificate) return
+                      setSelected(isOpen ? null : cert.id)
+                    }}
                     className={`w-full text-left rounded-2xl border overflow-hidden transition-all duration-300 group
                       ${isOpen
                         ? 'border-amber-500/50 shadow-xl shadow-amber-500/15 scale-[1.02]'
@@ -153,11 +157,15 @@ export default function CertificatesPage() {
                       </div>
 
                       <div className={`mt-3 w-full py-1.5 rounded-xl text-xs font-medium text-center transition-all ${
-                        isOpen
-                          ? 'bg-amber-500/20 text-amber-300'
-                          : 'bg-white/5 text-white/30 group-hover:bg-amber-500/15 group-hover:text-amber-300'
+                        canViewCertificate
+                          ? isOpen
+                            ? 'bg-amber-500/20 text-amber-300'
+                            : 'bg-white/5 text-white/30 group-hover:bg-amber-500/15 group-hover:text-amber-300'
+                          : 'bg-amber-500/10 text-amber-300/70'
                       }`}>
-                        {isOpen ? '▲ Hide Certificate' : '▼ View & Download'}
+                        {canViewCertificate
+                          ? isOpen ? '▲ Hide Certificate' : '▼ View & Download'
+                          : 'Awaiting Admin Verification'}
                       </div>
                     </div>
                   </button>

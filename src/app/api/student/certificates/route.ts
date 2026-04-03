@@ -7,7 +7,10 @@ export async function GET(req: NextRequest) {
   if (error) return error
 
   const certificates = await prisma.certificate.findMany({
-    where: { userId: session!.userId },
+    where: {
+      userId: session!.userId,
+      status: 'VERIFIED',
+    },
     include: {
       course: {
         include: {

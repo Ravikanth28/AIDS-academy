@@ -185,13 +185,13 @@ export default function CourseDetailPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ count: 5 }),
       })
-      if (!res.ok) throw new Error('Failed to generate questions')
       const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to generate questions')
       setAiQuestions(data.questions)
       setShowAiQuiz(true)
       toast.success('AI questions generated!')
-    } catch {
-      toast.error('Could not generate questions. Transcript may be unavailable.')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not generate questions. Transcript may be unavailable.')
     } finally {
       setLoadingMcq(false)
     }
@@ -205,13 +205,13 @@ export default function CourseDetailPage() {
       const res = await fetch(`/api/student/generate-notes/${selectedModule.id}`, {
         method: 'POST',
       })
-      if (!res.ok) throw new Error('Failed to generate notes')
       const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to generate notes')
       setAiNotes(data.notes)
       setShowNotes(true)
       toast.success('Notes generated!')
-    } catch {
-      toast.error('Could not generate notes. Transcript may be unavailable.')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not generate notes. Transcript may be unavailable.')
     } finally {
       setLoadingNotes(false)
     }
@@ -234,13 +234,13 @@ export default function CourseDetailPage() {
     setResources([])
     try {
       const res = await fetch(`/api/student/resources/${selectedModule.id}`, { method: 'POST' })
-      if (!res.ok) throw new Error('Failed to find resources')
       const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to find resources')
       setResources(data.resources)
       setShowResources(true)
       toast.success('Resources found!')
-    } catch {
-      toast.error('Could not find resources.')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not find resources.')
     } finally {
       setLoadingResources(false)
     }
@@ -275,13 +275,13 @@ export default function CourseDetailPage() {
     setMindmapData(null)
     try {
       const res = await fetch(`/api/student/mindmap/${selectedModule.id}`, { method: 'POST' })
-      if (!res.ok) throw new Error('Failed to generate mind map')
       const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to generate mind map')
       setMindmapData(data.mindmap)
       setShowMindmap(true)
       toast.success('Mind map generated!')
-    } catch {
-      toast.error('Could not generate mind map.')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not generate mind map.')
     } finally {
       setLoadingMindmap(false)
     }
