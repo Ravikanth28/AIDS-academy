@@ -25,14 +25,24 @@ export async function POST(req: NextRequest, { params }: { params: { moduleId: s
 
     // Gather transcripts
     const transcripts: string[] = []
+    let transcriptCount = 0
     for (const video of module_.videos) {
       try {
         const segments = await getTranscript(video.youtubeUrl)
-        transcripts.push(`Video: ${video.title}\n${transcriptToText(segments)}`)
+        const text = transcriptToText(segments)
+        if (text) {
+          transcripts.push(`Video: ${video.title}\n${text}`)
+          transcriptCount++
+        }
       } catch (err) {
         console.warn(`Could not fetch transcript for ${video.title}:`, err)
-        transcripts.push(`Video: ${video.title}\n[Transcript unavailable]`)
       }
+    }
+
+    if (transcriptCount === 0) {
+      return NextResponse.json({
+        error: 'No YouTube transcript/subtitles are available for this module, so AI notes cannot be generated.',
+      }, { status: 400 })
     }
 
     const combinedTranscript = transcripts.join('\n\n---\n\n')
@@ -51,6 +61,9 @@ The notes should be in clean Markdown format with:
 Make the notes student-friendly, clear, and easy to review for exams.`
 
     const userPrompt = `Create detailed study notes for the module "${module_.title}" (Course: ${module_.course.title}).
+
+Base the notes strictly on the transcript text below.
+Do not infer or invent topics from the module title or course title alone.
 
 Video transcripts:
 ${trimmed}`

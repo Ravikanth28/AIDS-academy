@@ -20,17 +20,26 @@ export async function POST(req: NextRequest, { params }: { params: { moduleId: s
     if (!module_) return NextResponse.json({ error: 'Module not found' }, { status: 404 })
 
     // Gather transcripts
-    let topicContext = `Module: ${module_.title}\nCourse: ${module_.course.title}`
-    if (module_.description) topicContext += `\nDescription: ${module_.description}`
+    let topicContext = ''
+    let transcriptCount = 0
 
     for (const video of module_.videos) {
       try {
         const segments = await getTranscript(video.youtubeUrl)
         const text = transcriptToText(segments)
-        topicContext += `\n\nVideo "${video.title}":\n${text.slice(0, 2000)}`
+        if (text) {
+          topicContext += `\n\nVideo "${video.title}":\n${text.slice(0, 2000)}`
+          transcriptCount++
+        }
       } catch {
         // skip
       }
+    }
+
+    if (transcriptCount === 0) {
+      return NextResponse.json({
+        error: 'No YouTube transcript/subtitles are available for this module, so AI mind map generation cannot run.',
+      }, { status: 400 })
     }
 
     const maxChars = 10000
@@ -62,7 +71,11 @@ Rules:
 - Cover all major concepts from the transcripts
 - Organize logically from fundamentals to advanced topics`
 
-    const userPrompt = `Generate a comprehensive mind map for:\n\n${trimmed}`
+    const userPrompt = `Generate a comprehensive mind map strictly from this transcript content.
+
+Do not invent concepts from the module title or course title alone.
+
+${trimmed}`
 
     const response = await chatCompletion(systemPrompt, userPrompt, { temperature: 0.3 })
 

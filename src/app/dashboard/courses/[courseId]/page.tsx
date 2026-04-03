@@ -185,13 +185,13 @@ export default function CourseDetailPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ count: 5 }),
       })
-      if (!res.ok) throw new Error('Failed to generate questions')
       const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to generate questions')
       setAiQuestions(data.questions)
       setShowAiQuiz(true)
       toast.success('AI questions generated!')
-    } catch {
-      toast.error('Could not generate questions. Transcript may be unavailable.')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not generate questions. Transcript may be unavailable.')
     } finally {
       setLoadingMcq(false)
     }
@@ -205,13 +205,13 @@ export default function CourseDetailPage() {
       const res = await fetch(`/api/student/generate-notes/${selectedModule.id}`, {
         method: 'POST',
       })
-      if (!res.ok) throw new Error('Failed to generate notes')
       const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to generate notes')
       setAiNotes(data.notes)
       setShowNotes(true)
       toast.success('Notes generated!')
-    } catch {
-      toast.error('Could not generate notes. Transcript may be unavailable.')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not generate notes. Transcript may be unavailable.')
     } finally {
       setLoadingNotes(false)
     }
@@ -234,13 +234,13 @@ export default function CourseDetailPage() {
     setResources([])
     try {
       const res = await fetch(`/api/student/resources/${selectedModule.id}`, { method: 'POST' })
-      if (!res.ok) throw new Error('Failed to find resources')
       const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to find resources')
       setResources(data.resources)
       setShowResources(true)
       toast.success('Resources found!')
-    } catch {
-      toast.error('Could not find resources.')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not find resources.')
     } finally {
       setLoadingResources(false)
     }
@@ -263,7 +263,7 @@ export default function CourseDetailPage() {
       case 'dataset': return 'text-emerald-300 bg-emerald-500/15 border-emerald-500/30'
       case 'notebook': return 'text-orange-300 bg-orange-500/15 border-orange-500/30'
       case 'slides': case 'presentation': return 'text-blue-300 bg-blue-500/15 border-blue-500/30'
-      case 'pdf': return 'text-red-300 bg-red-500/15 border-red-500/30'
+      case 'pdf': return 'text-zinc-300 bg-zinc-500/15 border-zinc-500/30'
       case 'article': case 'tutorial': return 'text-yellow-300 bg-yellow-500/15 border-yellow-500/30'
       default: return 'text-purple-300 bg-purple-500/15 border-purple-500/30'
     }
@@ -275,13 +275,13 @@ export default function CourseDetailPage() {
     setMindmapData(null)
     try {
       const res = await fetch(`/api/student/mindmap/${selectedModule.id}`, { method: 'POST' })
-      if (!res.ok) throw new Error('Failed to generate mind map')
       const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to generate mind map')
       setMindmapData(data.mindmap)
       setShowMindmap(true)
       toast.success('Mind map generated!')
-    } catch {
-      toast.error('Could not generate mind map.')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not generate mind map.')
     } finally {
       setLoadingMindmap(false)
     }
@@ -467,7 +467,7 @@ export default function CourseDetailPage() {
                   Module {selectedModule.order}: {selectedModule.title}
                 </h2>
                 {/* Test button */}
-                {getProgress(selectedModule.id)?.videoCompleted && (
+                {getProgress(selectedModule.id)?.videoCompleted && selectedModule._count.questions > 0 && (
                   <Link
                     href={`/dashboard/courses/${courseId}/test/${selectedModule.id}`}
                     className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all
@@ -478,6 +478,9 @@ export default function CourseDetailPage() {
                     <ClipboardList className="w-4 h-4" />
                     {getProgress(selectedModule.id)?.testPassed ? 'Retake Test' : 'Take Test'}
                   </Link>
+                )}
+                {getProgress(selectedModule.id)?.videoCompleted && selectedModule._count.questions === 0 && (
+                  <span className="text-xs text-white/30 italic">No test questions yet</span>
                 )}
               </div>
 

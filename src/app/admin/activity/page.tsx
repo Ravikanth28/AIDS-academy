@@ -19,7 +19,7 @@ interface LogEntry {
 
 const ACTION_META: Record<string, { icon: typeof LogIn; color: string; label: string }> = {
   LOGIN:               { icon: LogIn,      color: 'text-green-400 bg-green-500/15',   label: 'Login' },
-  LOGOUT:              { icon: LogOut,     color: 'text-red-400 bg-red-500/15',       label: 'Logout' },
+  LOGOUT:              { icon: LogOut,     color: 'text-zinc-400 bg-zinc-500/15',    label: 'Logout' },
   ENROLLED:            { icon: BookOpen,   color: 'text-purple-400 bg-purple-500/15', label: 'Enrolled' },
   VIDEO_WATCHED:       { icon: PlayCircle, color: 'text-cyan-400 bg-cyan-500/15',     label: 'Video' },
   TEST_PASSED:         { icon: Zap,        color: 'text-amber-400 bg-amber-500/15',   label: 'Test Passed' },

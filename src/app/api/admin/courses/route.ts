@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   if (error) return error
 
   const body = await req.json()
-  const { title, description, category, thumbnail, moduleCount } = body
+  const { title, description, category, thumbnail, moduleCount, moduleNames } = body
 
   if (!title || !description || !moduleCount || moduleCount < 1) {
     return NextResponse.json({ error: 'Title, description, and module count required' }, { status: 400 })
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       thumbnail,
       modules: {
         create: Array.from({ length: moduleCount }, (_, i) => ({
-          title: `Module ${i + 1}`,
+          title: (Array.isArray(moduleNames) && moduleNames[i]) ? moduleNames[i] : `Module ${i + 1}`,
           description: '',
           order: i + 1,
           passingScore: 60,

@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
-import { Brain, Phone, User, ArrowRight, Zap, Loader2 } from 'lucide-react'
+import { Brain, Phone, User, ArrowRight, Zap, Loader2, Mail, Lock, Eye, EyeOff } from 'lucide-react'
 
 type Step = 'details' | 'otp'
 
@@ -12,17 +12,24 @@ export default function RegisterPage() {
   const router = useRouter()
   const [step, setStep] = useState<Step>('details')
   const [loading, setLoading] = useState(false)
-  const [form, setForm] = useState({ name: '', phone: '' })
+  const [form, setForm] = useState({ name: '', phone: '', email: '', password: '' })
   const [otp, setOtp] = useState('')
   const [demoOtp, setDemoOtp] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
 
   async function handleSendOtp(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.name.trim() || !form.phone.trim()) {
+    if (!form.name.trim() || !form.phone.trim() || !form.email.trim() || !form.password.trim()) {
       return toast.error('Please fill all fields')
     }
     if (!/^\d{10}$/.test(form.phone)) {
       return toast.error('Enter a valid 10-digit phone number')
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      return toast.error('Enter a valid email address')
+    }
+    if (form.password.length < 6) {
+      return toast.error('Password must be at least 6 characters')
     }
     setLoading(true)
     try {
@@ -51,11 +58,18 @@ export default function RegisterPage() {
       const res = await fetch('/api/auth/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: form.phone, otp, action: 'register', name: form.name }),
+        body: JSON.stringify({
+          phone: form.phone,
+          otp,
+          action: 'register',
+          name: form.name,
+          email: form.email,
+          password: form.password,
+        }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'OTP verification failed')
-      toast.success('Account created! Welcome 🎉')
+      toast.success('Account created! Welcome!')
       router.push(data.role === 'ADMIN' ? '/admin' : '/dashboard')
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong')
@@ -117,6 +131,38 @@ export default function RegisterPage() {
                     className="input-field pl-10"
                     required
                   />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm text-white/60 mb-2 block">Email Address</label>
+                <div className="relative">
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+                  <input
+                    type="email"
+                    placeholder="you@example.com"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    className="input-field pl-10"
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm text-white/60 mb-2 block">Password</label>
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Min 6 characters"
+                    value={form.password}
+                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    className="input-field pl-10 pr-10"
+                    required
+                  />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors">
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
               <div>

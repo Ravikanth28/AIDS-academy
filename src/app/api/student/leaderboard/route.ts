@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   const year = parseInt(searchParams.get('year') ?? String(now.getFullYear()))
 
   const rows = await prisma.monthlyPoints.findMany({
-    where: { month, year },
+    where: { month, year, user: { role: 'STUDENT' } },
     orderBy: { points: 'desc' },
     include: {
       user: { select: { id: true, name: true } },
@@ -32,7 +32,9 @@ export async function GET(req: NextRequest) {
   const myEntry = await prisma.monthlyPoints.findUnique({
     where: { userId_month_year: { userId: session.userId, month, year } },
   })
-  const allSorted = await prisma.monthlyPoints.count({ where: { month, year, points: { gte: myEntry?.points ?? 0 } } })
+  const allSorted = await prisma.monthlyPoints.count({
+    where: { month, year, user: { role: 'STUDENT' }, points: { gte: myEntry?.points ?? 0 } },
+  })
 
   return NextResponse.json({
     month,
@@ -40,6 +42,6 @@ export async function GET(req: NextRequest) {
     leaderboard: ranked,
     myRank: myEntry ? allSorted : null,
     myPoints: myEntry?.points ?? 0,
-    totalParticipants: await prisma.monthlyPoints.count({ where: { month, year } }),
+    totalParticipants: await prisma.monthlyPoints.count({ where: { month, year, user: { role: 'STUDENT' } } }),
   })
 }

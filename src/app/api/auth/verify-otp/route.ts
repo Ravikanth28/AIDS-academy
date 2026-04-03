@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { signToken } from '@/lib/auth'
 import { logActivity, POINTS } from '@/lib/points'
 
 export async function POST(req: NextRequest) {
   try {
-    const { phone, otp, action, name } = await req.json()
+    const { phone, otp, action, name, email, password } = await req.json()
 
     if (!phone || !otp) {
       return NextResponse.json({ error: 'Phone and OTP are required' }, { status: 400 })
@@ -32,11 +33,19 @@ export async function POST(req: NextRequest) {
 
     let user
     if (action === 'register') {
+      // Validate registration fields
+      if (!email?.trim() || !password?.trim()) {
+        return NextResponse.json({ error: 'Email and password are required for registration' }, { status: 400 })
+      }
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 10)
       // Create the user
       user = await prisma.user.create({
         data: {
           name: name || phone,
           phone,
+          email: email.trim().toLowerCase(),
+          password: hashedPassword,
           role: 'STUDENT',
         },
       })

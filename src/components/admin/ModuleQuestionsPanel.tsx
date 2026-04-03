@@ -536,7 +536,7 @@ export default function ModuleQuestionsPanel({ moduleId, passingScore, questionC
                       {checkpoints.length > 1 && (
                         <button
                           onClick={() => setCheckpoints(checkpoints.filter((_, i) => i !== cpIdx))}
-                          className="text-xs text-red-400/70 hover:text-red-400 flex items-center gap-1"
+                          className="text-xs text-zinc-400/70 hover:text-zinc-300 flex items-center gap-1"
                         >
                           <Trash2 className="w-3 h-3" /> Remove checkpoint
                         </button>
@@ -639,7 +639,7 @@ export default function ModuleQuestionsPanel({ moduleId, passingScore, questionC
                 </div>
                 <button
                   onClick={() => handleDeleteQuestion(q.id)}
-                  className="p-1.5 rounded-lg hover:bg-red-500/20 text-white/30 hover:text-red-400 transition-colors flex-shrink-0"
+                  className="p-1.5 rounded-lg hover:bg-zinc-500/20 text-white/30 hover:text-zinc-300 transition-colors flex-shrink-0"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>

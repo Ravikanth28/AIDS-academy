@@ -20,17 +20,26 @@ export async function POST(req: NextRequest, { params }: { params: { moduleId: s
     if (!module_) return NextResponse.json({ error: 'Module not found' }, { status: 404 })
 
     // Try to get transcript context for better recommendations
-    let topicContext = `Module: ${module_.title}\nCourse: ${module_.course.title}\nCategory: ${module_.course.category || 'AI & Data Science'}`
-    if (module_.description) topicContext += `\nDescription: ${module_.description}`
+    let topicContext = ''
+    let transcriptCount = 0
 
     for (const video of module_.videos.slice(0, 2)) {
       try {
         const segments = await getTranscript(video.youtubeUrl)
         const text = transcriptToText(segments)
-        topicContext += `\nVideo "${video.title}" covers: ${text.slice(0, 500)}`
+        if (text) {
+          topicContext += `\nVideo "${video.title}" covers: ${text.slice(0, 500)}`
+          transcriptCount++
+        }
       } catch {
         // skip silently
       }
+    }
+
+    if (transcriptCount === 0) {
+      return NextResponse.json({
+        error: 'No YouTube transcript/subtitles are available for this module, so AI resource recommendations cannot be generated reliably.',
+      }, { status: 400 })
     }
 
     const systemPrompt = `You are an AI learning assistant. Based on the module topic and context, recommend relevant free learning resources.
@@ -57,7 +66,11 @@ IMPORTANT:
 - Aim for 6-10 diverse resources across different types
 - Focus on beginner to intermediate level resources`
 
-    const userPrompt = `Find relevant learning resources for this module:\n\n${topicContext}`
+    const userPrompt = `Find relevant learning resources strictly based on this transcript-derived topic context.
+
+Do not infer the topic from the module or course name alone.
+
+${topicContext}`
 
     const response = await chatCompletion(systemPrompt, userPrompt, { temperature: 0.3 })
 

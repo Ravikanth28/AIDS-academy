@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const year = parseInt(searchParams.get('year') ?? String(now.getFullYear()))
 
   const rows = await prisma.monthlyPoints.findMany({
-    where: { month, year },
+    where: { month, year, user: { role: 'STUDENT' } },
     orderBy: { points: 'desc' },
     include: {
       user: { select: { id: true, name: true, phone: true } },

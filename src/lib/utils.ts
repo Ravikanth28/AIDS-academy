@@ -27,7 +27,7 @@ export function getYouTubeThumbnail(url: string): string {
 export function getYouTubeEmbedUrl(url: string): string {
   const id = getYouTubeVideoId(url)
   if (!id) return ''
-  return `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1`
+  return `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&cc_load_policy=0&fs=0`
 }
 
 /**

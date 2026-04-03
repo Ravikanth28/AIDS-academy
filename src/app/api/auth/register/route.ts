@@ -5,19 +5,29 @@ import { sendOTP } from '@/lib/sms'
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, phone } = await req.json()
+    const { name, phone, email, password } = await req.json()
 
-    if (!name?.trim() || !phone?.trim()) {
-      return NextResponse.json({ error: 'Name and phone are required' }, { status: 400 })
+    if (!name?.trim() || !phone?.trim() || !email?.trim() || !password?.trim()) {
+      return NextResponse.json({ error: 'Name, email, password, and phone are required' }, { status: 400 })
     }
     if (!/^\d{10}$/.test(phone)) {
       return NextResponse.json({ error: 'Invalid phone number' }, { status: 400 })
     }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      return NextResponse.json({ error: 'Invalid email address' }, { status: 400 })
+    }
+    if (password.length < 6) {
+      return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 })
+    }
 
-    // Check if user already exists with that number
-    const existing = await prisma.user.findUnique({ where: { phone } })
-    if (existing) {
+    // Check if user already exists with that phone or email
+    const existingPhone = await prisma.user.findUnique({ where: { phone } })
+    if (existingPhone) {
       return NextResponse.json({ error: 'Phone number already registered. Please login.' }, { status: 409 })
+    }
+    const existingEmail = await prisma.user.findFirst({ where: { email: email.trim().toLowerCase() } })
+    if (existingEmail) {
+      return NextResponse.json({ error: 'Email already registered. Please login.' }, { status: 409 })
     }
 
     const otp = generateOTP()

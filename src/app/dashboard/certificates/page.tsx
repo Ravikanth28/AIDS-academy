@@ -8,6 +8,8 @@ import CertificateCard from '@/components/student/CertificateCard'
 interface Certificate {
   id: string
   certificateNo: string
+  status: 'PENDING' | 'VERIFIED' | 'REVOKED'
+  revokedReason: string | null
   issuedAt: string
   course: {
     title: string
@@ -92,11 +94,15 @@ export default function CertificatesPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5 mb-6">
             {certs.map((cert, i) => {
               const isOpen = selected === cert.id
+              const canViewCertificate = cert.status === 'VERIFIED'
               const grad = getCertGradient(cert.course.category)
               return (
                 <motion.div key={cert.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}>
                   <button
-                    onClick={() => setSelected(isOpen ? null : cert.id)}
+                    onClick={() => {
+                      if (!canViewCertificate) return
+                      setSelected(isOpen ? null : cert.id)
+                    }}
                     className={`w-full text-left rounded-2xl border overflow-hidden transition-all duration-300 group
                       ${isOpen
                         ? 'border-amber-500/50 shadow-xl shadow-amber-500/15 scale-[1.02]'
@@ -116,9 +122,17 @@ export default function CertificatesPage() {
                           <Star className="w-7 h-7 text-amber-200" />
                         </div>
                       </div>
-                      {/* Earned badge */}
-                      <div className="absolute top-2.5 right-3">
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 border border-green-500/25 font-medium backdrop-blur-sm">✓ Earned</span>
+      {/* Earned badge */}
+                      <div className="absolute top-2.5 right-3 flex items-center gap-1">
+                        {cert.status === 'VERIFIED' && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 border border-green-500/25 font-medium backdrop-blur-sm">✓ Verified</span>
+                        )}
+                        {cert.status === 'PENDING' && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/25 font-medium backdrop-blur-sm">⏳ Pending</span>
+                        )}
+                        {cert.status === 'REVOKED' && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/25 font-medium backdrop-blur-sm">✗ Revoked</span>
+                        )}
                       </div>
                     </div>
 
@@ -143,11 +157,15 @@ export default function CertificatesPage() {
                       </div>
 
                       <div className={`mt-3 w-full py-1.5 rounded-xl text-xs font-medium text-center transition-all ${
-                        isOpen
-                          ? 'bg-amber-500/20 text-amber-300'
-                          : 'bg-white/5 text-white/30 group-hover:bg-amber-500/15 group-hover:text-amber-300'
+                        canViewCertificate
+                          ? isOpen
+                            ? 'bg-amber-500/20 text-amber-300'
+                            : 'bg-white/5 text-white/30 group-hover:bg-amber-500/15 group-hover:text-amber-300'
+                          : 'bg-amber-500/10 text-amber-300/70'
                       }`}>
-                        {isOpen ? '▲ Hide Certificate' : '▼ View & Download'}
+                        {canViewCertificate
+                          ? isOpen ? '▲ Hide Certificate' : '▼ View & Download'
+                          : 'Awaiting Admin Verification'}
                       </div>
                     </div>
                   </button>
@@ -174,6 +192,8 @@ export default function CertificatesPage() {
                     courseDescription={cert.course.description}
                     issuedAt={cert.issuedAt}
                     certificateNo={cert.certificateNo}
+                    status={cert.status}
+                    revokedReason={cert.revokedReason}
                   />
                 </motion.div>
               )

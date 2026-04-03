@@ -22,14 +22,24 @@ export async function POST(req: NextRequest, { params }: { params: { moduleId: s
 
     // Gather transcripts from all videos
     const transcripts: string[] = []
+    let transcriptCount = 0
     for (const video of module_.videos) {
       try {
         const segments = await getTranscript(video.youtubeUrl)
-        transcripts.push(`Video: ${video.title}\n${transcriptToText(segments)}`)
+        const text = transcriptToText(segments)
+        if (text) {
+          transcripts.push(`Video: ${video.title}\n${text}`)
+          transcriptCount++
+        }
       } catch (err) {
         console.warn(`Could not fetch transcript for ${video.title}:`, err)
-        transcripts.push(`Video: ${video.title}\n[Transcript unavailable]`)
       }
+    }
+
+    if (transcriptCount === 0) {
+      return NextResponse.json({
+        error: 'No YouTube transcript/subtitles are available for this module, so AI quiz generation cannot run.',
+      }, { status: 400 })
     }
 
     const combinedTranscript = transcripts.join('\n\n---\n\n')
@@ -59,7 +69,12 @@ Format:
   }
 ]`
 
-    const userPrompt = `Generate ${count} multiple-choice questions from these lecture transcripts for the module "${module_.title}":\n\n${trimmed}`
+    const userPrompt = `Generate ${count} multiple-choice questions strictly from these lecture transcripts for the module "${module_.title}".
+
+Use only facts that are explicitly present in the transcript text below.
+If the transcript does not contain enough information for a question, do not invent content.
+
+${trimmed}`
 
     const response = await chatCompletion(systemPrompt, userPrompt, { temperature: 0.5 })
 

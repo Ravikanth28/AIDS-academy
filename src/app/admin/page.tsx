@@ -145,7 +145,11 @@ export default function AdminDashboard() {
       const res = await fetch('/api/admin/leaderboard')
       if (res.ok) {
         const data = await res.json()
-        setLeaderboard((data.leaderboard ?? []).slice(0, 5))
+        setLeaderboard(
+          (data.leaderboard ?? [])
+            .map((e: LeaderEntry) => ({ ...e, name: e.user?.name ?? e.name ?? 'Unknown' }))
+            .slice(0, 5)
+        )
       }
     } catch { /* silently ignore */ }
   }
@@ -277,7 +281,7 @@ export default function AdminDashboard() {
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
                   <Pie data={stats.categoryPie} cx="50%" cy="50%" innerRadius={50} outerRadius={80}
-                    paddingAngle={3} dataKey="value" label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
+                    paddingAngle={3} dataKey="value" label={({ percent }) => `${((percent ?? 0) * 100).toFixed(0)}%`}
                     labelLine={false}>
                     {stats.categoryPie.map((_, i) => (
                       <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} opacity={0.85} />

@@ -16,12 +16,14 @@ import {
   Sparkles,
   Activity,
   Trophy,
+  Award,
 } from 'lucide-react'
 
 const navItems = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/courses', label: 'Courses', icon: BookOpen },
   { href: '/admin/students', label: 'Students', icon: Users },
+  { href: '/admin/certificates', label: 'Certificates', icon: Award },
   { href: '/admin/activity', label: 'Activity Log', icon: Activity },
   { href: '/admin/leaderboard', label: 'Leaderboard', icon: Trophy },
 ]

@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { getYouTubeVideoId, getYouTubeEmbedUrl } from '@/lib/utils'
-import { CheckCircle, Eye, Clock, Sparkles, X } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { getYouTubeVideoId } from '@/lib/utils'
+import { CheckCircle, Clock, Sparkles } from 'lucide-react'
 
 interface CheckpointQuestion {
   id: string
@@ -79,6 +79,8 @@ export default function VideoPlayer({ video, onWatched, isWatched, checkpoints =
   const [checkpointAnswered, setCheckpointAnswered] = useState(false)
   const [checkpointCorrect, setCheckpointCorrect] = useState(false)
   const answeredCheckpointsRef = useRef<Set<string>>(new Set())
+  const maxWatchedTimeRef = useRef<number>(0)
+  const seekCheckBlockedRef = useRef<boolean>(false)
   const playerContainerId = `yt-player-${video.id}`
 
   useEffect(() => {
@@ -91,6 +93,7 @@ export default function VideoPlayer({ video, onWatched, isWatched, checkpoints =
     setSelectedOption(null)
     setCheckpointAnswered(false)
     answeredCheckpointsRef.current = new Set()
+    maxWatchedTimeRef.current = 0
   }, [video.id])
 
   // Initialize YouTube IFrame API player
@@ -117,10 +120,17 @@ export default function VideoPlayer({ video, onWatched, isWatched, checkpoints =
           rel: 0,
           modestbranding: 1,
           enablejsapi: 1,
+          origin: window.location.origin,
+          playsinline: 1,
+          fs: 0,
+          iv_load_policy: 3,
+          cc_load_policy: 0,
+          disablekb: 1, // Disable keyboard controls (arrow keys to seek)
+          controls: 0,  // Hide YouTube controls (removes gear/settings icon)
         },
         events: {
           onStateChange: (event: { data: number }) => {
-            // Video ended
+            // Video ended — only mark as watched if they actually reached the end naturally
             if (event.data === 0 && !watched) {
               setWatched(true)
               onWatched()
@@ -129,16 +139,32 @@ export default function VideoPlayer({ video, onWatched, isWatched, checkpoints =
         },
       })
 
-      // Poll current time for checkpoint detection
-      if (checkpoints.length > 0) {
-        intervalRef.current = setInterval(() => {
-          if (!playerRef.current || destroyed) return
-          try {
-            const state = playerRef.current.getPlayerState()
-            // Only check during playback (state 1 = PLAYING)
-            if (state !== 1) return
-            const currentTime = playerRef.current.getCurrentTime()
-            // Find checkpoint that should trigger (within 1.5 second window)
+      // Poll current time for checkpoint detection AND anti-skip enforcement
+      intervalRef.current = setInterval(() => {
+        if (!playerRef.current || destroyed) return
+        try {
+          const state = playerRef.current.getPlayerState()
+          if (state !== 1) return // Only check during PLAYING state
+
+          const currentTime = playerRef.current.getCurrentTime()
+
+          // Anti-skip: if user seeks ahead of max watched time, snap back
+          if (currentTime > maxWatchedTimeRef.current + 2) {
+            if (!seekCheckBlockedRef.current) {
+              seekCheckBlockedRef.current = true
+              playerRef.current.seekTo(maxWatchedTimeRef.current, true)
+              setTimeout(() => { seekCheckBlockedRef.current = false }, 500)
+            }
+            return
+          }
+
+          // Update max watched time (only moves forward naturally)
+          if (currentTime > maxWatchedTimeRef.current) {
+            maxWatchedTimeRef.current = currentTime
+          }
+
+          // Check for checkpoint questions
+          if (checkpoints.length > 0) {
             for (const cp of checkpoints) {
               if (
                 !answeredCheckpointsRef.current.has(cp.id) &&
@@ -152,11 +178,11 @@ export default function VideoPlayer({ video, onWatched, isWatched, checkpoints =
                 break
               }
             }
-          } catch {
-            // Player may not be ready yet
           }
-        }, 500)
-      }
+        } catch {
+          // Player may not be ready yet
+        }
+      }, 500)
     }
 
     init()
@@ -189,22 +215,35 @@ export default function VideoPlayer({ video, onWatched, isWatched, checkpoints =
         playerRef.current.playVideo()
       }
     } else {
-      // Wrong answer — let them try again
+      // Wrong answer — restart video from beginning, reset all checkpoint progress
+      setActiveCheckpoint(null)
       setSelectedOption(null)
       setCheckpointAnswered(false)
+      answeredCheckpointsRef.current = new Set()
+      maxWatchedTimeRef.current = 0
+      if (playerRef.current) {
+        playerRef.current.seekTo(0, true)
+        playerRef.current.playVideo()
+      }
     }
   }
 
-  function handleMarkWatched() {
-    setWatched(true)
-    onWatched()
-  }
+  // Update the wrong-answer button text to indicate restart
 
   return (
     <div className="glass-card overflow-hidden">
       {/* YouTube player container */}
       <div className="relative w-full" style={{ paddingTop: '56.25%' }} ref={containerRef}>
         <div id={playerContainerId} className="absolute inset-0 w-full h-full" />
+        {/* Transparent overlay to block seeking via progress bar click */}
+        {!watched && (
+          <div
+            className="absolute bottom-0 left-0 right-0 h-10 z-[5]"
+            style={{ pointerEvents: 'auto' }}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => e.preventDefault()}
+          />
+        )}
 
         {/* Checkpoint Question Overlay */}
         {activeCheckpoint && (
@@ -271,7 +310,7 @@ export default function VideoPlayer({ video, onWatched, isWatched, checkpoints =
                         : 'bg-amber-500/20 border border-amber-500/30 text-amber-300 hover:bg-amber-500/30'
                     }`}
                   >
-                    {checkpointCorrect ? '✓ Correct! Continue watching' : 'Try again'}
+                    {checkpointCorrect ? '✓ Correct! Continue watching' : '✗ Wrong — Restart video from beginning'}
                   </button>
                 )}
               </div>
@@ -296,12 +335,9 @@ export default function VideoPlayer({ video, onWatched, isWatched, checkpoints =
             <CheckCircle className="w-4 h-4" /> Watched
           </div>
         ) : (
-          <button
-            onClick={handleMarkWatched}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-500/20 border border-purple-500/30 text-purple-300 rounded-xl text-sm hover:bg-purple-500/30 transition-all flex-shrink-0"
-          >
-            <Eye className="w-4 h-4" /> Mark as Watched
-          </button>
+          <div className="flex items-center gap-2 text-white/40 text-sm flex-shrink-0">
+            <Clock className="w-4 h-4" /> Watch fully to complete
+          </div>
         )}
       </div>
     </div>

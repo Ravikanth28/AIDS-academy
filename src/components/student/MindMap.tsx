@@ -39,7 +39,7 @@ const branchColors = [
   { bg: '#0891b220', border: '#0891b2', text: '#67e8f9' },
   { bg: '#059669', border: '#059669', text: '#6ee7b7' },
   { bg: '#d9770620', border: '#d97706', text: '#fcd34d' },
-  { bg: '#dc262620', border: '#dc2626', text: '#fca5a5' },
+  { bg: '#52525220', border: '#525252', text: '#d4d4d4' },
   { bg: '#2563eb20', border: '#2563eb', text: '#93c5fd' },
 ]
 
