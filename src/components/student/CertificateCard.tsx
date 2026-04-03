@@ -1,7 +1,8 @@
 'use client'
 
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState } from 'react'
 import { Download, Loader2, CheckCircle2, XCircle, Clock, ExternalLink } from 'lucide-react'
+import { getPublicAppUrl } from '@/lib/app-url'
 
 interface CertificateCardProps {
   studentName: string
@@ -24,11 +25,7 @@ export default function CertificateCard({
 }: CertificateCardProps) {
   const certRef = useRef<HTMLDivElement>(null)
   const [downloading, setDownloading] = useState(false)
-  const [origin, setOrigin] = useState('')
-
-  useEffect(() => { setOrigin(window.location.origin) }, [])
-
-  const verifyUrl = `${origin}/verify/${certificateNo}`
+  const verifyUrl = `${getPublicAppUrl()}/verify/${certificateNo}`
 
   const issueDate = new Date(issuedAt)
   const monthYear = issueDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
@@ -268,7 +265,7 @@ export default function CertificateCard({
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', marginBottom: 14 }}>
               <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, transparent, #d4a23718)' }} />
               <p style={{ color: '#d4a23740', fontSize: 9, fontFamily: 'monospace', margin: '0 14px', whiteSpace: 'nowrap' }}>
-                Verify at: {origin ? verifyUrl : `${typeof window !== 'undefined' ? window.location.origin : ''}/verify/${certificateNo}`}
+                Verify at: {verifyUrl}
               </p>
               <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, #d4a23718, transparent)' }} />
             </div>

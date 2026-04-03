@@ -19,7 +19,7 @@ interface Student {
     course: { id: string; title: string }
     moduleProgress: Array<{ testPassed: boolean }>
   }>
-  certificates: Array<{ id: string }>
+  certificates: Array<{ id: string; course: { id: string; title: string } }>
 }
 
 type SortKey = 'name' | 'joined' | 'progress' | 'courses'
@@ -63,6 +63,14 @@ export default function AdminStudentsPage() {
     const total = s.enrollments.reduce((a, e) => a + e.moduleProgress.length, 0)
     const done = s.enrollments.reduce((a, e) => a + e.moduleProgress.filter(p => p.testPassed).length, 0)
     return total === 0 ? 0 : Math.round((done / total) * 100)
+  }
+
+  function getCompletedCourseTitles(student: Student) {
+    return Array.from(new Set(student.certificates.map(cert => cert.course.title))).sort((a, b) => a.localeCompare(b))
+  }
+
+  function getEnrolledCourseTitles(student: Student) {
+    return Array.from(new Set(student.enrollments.map(enrollment => enrollment.course.title))).sort((a, b) => a.localeCompare(b))
   }
 
   const filtered = students
@@ -275,6 +283,15 @@ export default function AdminStudentsPage() {
                   const totalModules = student.enrollments.reduce((a, e) => a + e.moduleProgress.length, 0)
                   const doneMods = student.enrollments.reduce((a, e) => a + e.moduleProgress.filter(p => p.testPassed).length, 0)
                   const pct = totalModules === 0 ? 0 : Math.round((doneMods / totalModules) * 100)
+                  const completedCourseTitles = getCompletedCourseTitles(student)
+                  const enrolledCourseTitles = getEnrolledCourseTitles(student)
+                  const fallbackCourseTitles = enrolledCourseTitles.filter(title => !completedCourseTitles.includes(title))
+                  const displayedCourseTitles = completedCourseTitles.length > 0 ? completedCourseTitles : fallbackCourseTitles
+                  const courseCaption = completedCourseTitles.length > 0
+                    ? `${completedCourseTitles.length} completed`
+                    : fallbackCourseTitles.length > 0
+                      ? 'In progress'
+                      : ''
                   return (
                     <tr key={student.id} className="hover:bg-white/3 transition-colors group">
                       <td className="px-5 py-4">
@@ -296,12 +313,18 @@ export default function AdminStudentsPage() {
                         {student.enrollments.length === 0 ? (
                           <span className="text-xs text-white/25 italic">None</span>
                         ) : (
-                          <div className="flex items-center gap-1.5">
-                            <BookOpen className="w-3.5 h-3.5 text-cyan-400/70 flex-shrink-0" />
-                            <span className="text-sm text-white/70">{student.enrollments.length}</span>
-                            {totalModules > 0 && (
-                              <span className="text-xs text-white/30">({doneMods}/{totalModules} mod)</span>
-                            )}
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            <BookOpen className="w-3.5 h-3.5 text-cyan-400/70 flex-shrink-0 mt-0.5" />
+                            <div className="min-w-0">
+                              <div className="text-sm text-white/80 truncate">
+                                {displayedCourseTitles.join(', ')}
+                              </div>
+                              <div className="text-xs text-white/30 mt-0.5">
+                                {courseCaption}
+                                {totalModules > 0 && courseCaption ? ' • ' : ''}
+                                {totalModules > 0 ? `${doneMods}/${totalModules} mod` : ''}
+                              </div>
+                            </div>
                           </div>
                         )}
                       </td>

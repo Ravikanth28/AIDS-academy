@@ -5,10 +5,12 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Award, CheckCircle2, XCircle, Clock, Loader2, Search,
   ExternalLink, Copy, CheckCheck, RotateCcw, X, Filter,
-  BarChart3, Target, TrendingUp, PieChart, ArrowUpDown
+  BarChart3, TrendingUp, ArrowUpDown, ShieldCheck,
+  FileText, Users, ChevronDown, RefreshCw, Calendar
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
+import { getPublicAppUrl } from '@/lib/app-url'
 
 interface Cert {
   id: string
@@ -20,14 +22,20 @@ interface Cert {
   course: { id: string; title: string; category: string }
 }
 
+interface CourseOption {
+  id: string
+  title: string
+}
+
 const STATUS_STYLES = {
-  VERIFIED: { label: 'Verified', cls: 'bg-green-500/15 text-green-300 border-green-500/30', icon: CheckCircle2, iconCls: 'text-green-400' },
-  PENDING:  { label: 'Pending',  cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30',  icon: Clock,         iconCls: 'text-amber-400'  },
-  REVOKED:  { label: 'Revoked',  cls: 'bg-red-500/15   text-red-300   border-red-500/30',    icon: XCircle,       iconCls: 'text-red-400'    },
+  VERIFIED: { label: 'Verified', cls: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25', icon: CheckCircle2, iconCls: 'text-emerald-400', dot: 'bg-emerald-400' },
+  PENDING:  { label: 'Pending',  cls: 'bg-amber-500/10 text-amber-300 border-amber-500/25',      icon: Clock,         iconCls: 'text-amber-400',   dot: 'bg-amber-400'  },
+  REVOKED:  { label: 'Revoked',  cls: 'bg-red-500/10 text-red-300 border-red-500/25',             icon: XCircle,       iconCls: 'text-red-400',     dot: 'bg-red-400'    },
 }
 
 export default function AdminCertificatesPage() {
   const [certs, setCerts] = useState<Cert[]>([])
+  const [allCourses, setAllCourses] = useState<CourseOption[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('ALL')
@@ -40,8 +48,13 @@ export default function AdminCertificatesPage() {
   const [bulkLoading, setBulkLoading] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [expandedRow, setExpandedRow] = useState<string | null>(null)
+  const [showFilters, setShowFilters] = useState(false)
 
-  useEffect(() => { fetchCerts() }, [])
+  useEffect(() => {
+    fetchCerts()
+    fetchCourses()
+  }, [])
 
   async function fetchCerts() {
     setLoading(true)
@@ -53,7 +66,21 @@ export default function AdminCertificatesPage() {
     }
   }
 
-  // Unique lists for filters
+  async function fetchCourses() {
+    try {
+      const res = await fetch('/api/admin/courses')
+      if (!res.ok) return
+
+      const data = await res.json()
+      setAllCourses(data.map((course: { id: string; title: string }) => ({
+        id: course.id,
+        title: course.title,
+      })))
+    } catch {
+      // Leave the filter usable with certificate-derived courses if the course list fails to load.
+    }
+  }
+
   const students = useMemo(() => {
     const map = new Map<string, string>()
     certs.forEach(c => map.set(c.user.id, c.user.name))
@@ -62,11 +89,11 @@ export default function AdminCertificatesPage() {
 
   const courses = useMemo(() => {
     const map = new Map<string, string>()
+    allCourses.forEach(c => map.set(c.id, c.title))
     certs.forEach(c => map.set(c.course.id, c.course.title))
     return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]))
-  }, [certs])
+  }, [allCourses, certs])
 
-  // Filtered + sorted list
   const filtered = useMemo(() => {
     let list = certs.filter(c => {
       if (filterStatus !== 'ALL' && c.status !== filterStatus) return false
@@ -89,16 +116,19 @@ export default function AdminCertificatesPage() {
     return list
   }, [certs, filterStatus, filterStudent, filterCourse, search, sortBy])
 
-  // Live stats based on filtered data
   const stats = useMemo(() => {
-    const total = filtered.length
-    const uniqueStudents = new Set(filtered.map(c => c.user.id)).size
-    const verified = filtered.filter(c => c.status === 'VERIFIED').length
-    const pending = filtered.filter(c => c.status === 'PENDING').length
-    const revoked = filtered.filter(c => c.status === 'REVOKED').length
+    const total = certs.length
+    const uniqueStudents = new Set(certs.map(c => c.user.id)).size
+    const verified = certs.filter(c => c.status === 'VERIFIED').length
+    const pending = certs.filter(c => c.status === 'PENDING').length
+    const revoked = certs.filter(c => c.status === 'REVOKED').length
     const verifyRate = total > 0 ? ((verified / total) * 100).toFixed(1) : '0.0'
     return { total, uniqueStudents, verified, pending, revoked, verifyRate }
-  }, [filtered])
+  }, [certs])
+
+  const activeFiltersCount = [filterStatus !== 'ALL', filterStudent !== 'ALL', filterCourse !== 'ALL', search !== ''].filter(Boolean).length
+  const filterSelectClassName = 'w-full bg-white/[0.05] border border-white/[0.08] rounded-lg px-3 py-2.5 text-sm text-white/70 focus:outline-none focus:border-purple-500/40 transition-all'
+  const dropdownOptionClassName = 'bg-[#1a1b22] text-white'
 
   async function handleVerify(cert: Cert) {
     setActionLoading(cert.id)
@@ -180,11 +210,15 @@ export default function AdminCertificatesPage() {
   }
 
   function copyVerifyLink(cert: Cert) {
-    const url = `${window.location.origin}/verify/${cert.certificateNo}`
+    const url = `${getPublicAppUrl()}/verify/${cert.certificateNo}`
     navigator.clipboard.writeText(url).then(() => {
       setCopied(cert.id)
       setTimeout(() => setCopied(null), 2000)
     })
+  }
+
+  function clearAllFilters() {
+    setSearch(''); setFilterStudent('ALL'); setFilterCourse('ALL'); setFilterStatus('ALL')
   }
 
   const allSelected = filtered.length > 0 && selectedIds.size === filtered.length
@@ -196,277 +230,438 @@ export default function AdminCertificatesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="font-display text-3xl font-bold flex items-center gap-3">
-          <Award className="w-7 h-7 text-amber-400" />
-          <span className="gradient-text">Certificate Verification</span>
-        </h1>
-        <p className="text-white/40 mt-1 text-sm">Review and verify student certificates</p>
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 text-xs text-white/30 mb-2">
+            <Link href="/admin" className="hover:text-white/60 transition-colors">Dashboard</Link>
+            <span>/</span>
+            <span className="text-white/50">Certificates</span>
+          </div>
+          <h1 className="font-display text-2xl sm:text-3xl font-bold flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/20 flex items-center justify-center">
+              <ShieldCheck className="w-5 h-5 text-amber-400" />
+            </div>
+            <div>
+              <span className="gradient-text">Certificate Management</span>
+              <p className="text-white/35 text-sm font-normal mt-0.5">Review, verify & manage student certificates</p>
+            </div>
+          </h1>
+        </div>
+        <button
+          onClick={fetchCerts}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm text-white/60 hover:text-white hover:border-white/20 transition-all disabled:opacity-40 self-start"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
       </div>
 
-      {/* Live stats — update with filters */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-        <div className="glass-card p-4 md:col-span-1 rounded-2xl border border-white/8">
-          <div className="flex items-center gap-2 mb-1">
-            <BarChart3 className="w-3.5 h-3.5 text-purple-400" />
-            <p className="text-[10px] text-white/40 uppercase tracking-wider">Total</p>
+      {/* ── Statistics Overview ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Total Certificates */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/[0.04] to-white/[0.01] border border-white/[0.08] p-5">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/5 rounded-full -translate-y-8 translate-x-8" />
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-9 h-9 rounded-lg bg-purple-500/15 border border-purple-500/20 flex items-center justify-center">
+              <FileText className="w-4 h-4 text-purple-400" />
+            </div>
+            <p className="text-xs text-white/40 font-medium uppercase tracking-wider">Total Issued</p>
           </div>
-          <p className="font-display text-2xl font-bold gradient-text">{stats.total}</p>
-          <p className="text-[10px] text-white/30 mt-0.5">{stats.uniqueStudents} students</p>
+          <p className="font-display text-3xl font-bold gradient-text">{stats.total}</p>
+          <div className="flex items-center gap-1.5 mt-2">
+            <Users className="w-3 h-3 text-white/25" />
+            <p className="text-xs text-white/30">{stats.uniqueStudents} unique students</p>
+          </div>
         </div>
-        <div className="glass-card p-4 md:col-span-1 rounded-2xl border border-green-500/20 cursor-pointer hover:border-green-500/40 transition-colors"
-          onClick={() => setFilterStatus(filterStatus === 'VERIFIED' ? 'ALL' : 'VERIFIED')}>
-          <div className="flex items-center gap-2 mb-1">
-            <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
-            <p className="text-[10px] text-white/40 uppercase tracking-wider">Verified</p>
+
+        {/* Verified */}
+        <div
+          className={`relative overflow-hidden rounded-2xl border p-5 cursor-pointer transition-all duration-200 ${
+            filterStatus === 'VERIFIED'
+              ? 'bg-emerald-500/[0.08] border-emerald-500/30 shadow-lg shadow-emerald-500/5'
+              : 'bg-gradient-to-br from-white/[0.04] to-white/[0.01] border-white/[0.08] hover:border-emerald-500/20'
+          }`}
+          onClick={() => setFilterStatus(filterStatus === 'VERIFIED' ? 'ALL' : 'VERIFIED')}
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -translate-y-8 translate-x-8" />
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-9 h-9 rounded-lg bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            </div>
+            <p className="text-xs text-white/40 font-medium uppercase tracking-wider">Verified</p>
           </div>
-          <p className="font-display text-2xl font-bold text-green-400">{stats.verified}</p>
-          <p className="text-[10px] text-white/30 mt-0.5">{stats.verifyRate}% rate</p>
+          <p className="font-display text-3xl font-bold text-emerald-400">{stats.verified}</p>
+          <div className="mt-2 flex items-center gap-2">
+            <div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden">
+              <div className="h-full rounded-full bg-emerald-500/60 transition-all duration-500" style={{ width: `${stats.total > 0 ? (stats.verified / stats.total) * 100 : 0}%` }} />
+            </div>
+            <span className="text-[10px] text-emerald-400/60 font-medium">{stats.verifyRate}%</span>
+          </div>
         </div>
-        <div className="glass-card p-4 md:col-span-1 rounded-2xl border border-amber-500/20 cursor-pointer hover:border-amber-500/40 transition-colors"
-          onClick={() => setFilterStatus(filterStatus === 'PENDING' ? 'ALL' : 'PENDING')}>
-          <div className="flex items-center gap-2 mb-1">
-            <Clock className="w-3.5 h-3.5 text-amber-400" />
-            <p className="text-[10px] text-white/40 uppercase tracking-wider">Pending</p>
+
+        {/* Pending */}
+        <div
+          className={`relative overflow-hidden rounded-2xl border p-5 cursor-pointer transition-all duration-200 ${
+            filterStatus === 'PENDING'
+              ? 'bg-amber-500/[0.08] border-amber-500/30 shadow-lg shadow-amber-500/5'
+              : 'bg-gradient-to-br from-white/[0.04] to-white/[0.01] border-white/[0.08] hover:border-amber-500/20'
+          }`}
+          onClick={() => setFilterStatus(filterStatus === 'PENDING' ? 'ALL' : 'PENDING')}
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full -translate-y-8 translate-x-8" />
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-9 h-9 rounded-lg bg-amber-500/15 border border-amber-500/20 flex items-center justify-center">
+              <Clock className="w-4 h-4 text-amber-400" />
+            </div>
+            <p className="text-xs text-white/40 font-medium uppercase tracking-wider">Pending Review</p>
           </div>
-          <p className="font-display text-2xl font-bold text-amber-400">{stats.pending}</p>
-          <p className="text-[10px] text-white/30 mt-0.5">awaiting review</p>
+          <p className="font-display text-3xl font-bold text-amber-400">{stats.pending}</p>
+          <p className="text-xs text-white/25 mt-2">
+            {stats.pending > 0 ? 'Needs your attention' : 'All reviewed'}
+          </p>
         </div>
-        <div className="glass-card p-4 md:col-span-1 rounded-2xl border border-red-500/20 cursor-pointer hover:border-red-500/40 transition-colors"
-          onClick={() => setFilterStatus(filterStatus === 'REVOKED' ? 'ALL' : 'REVOKED')}>
-          <div className="flex items-center gap-2 mb-1">
-            <XCircle className="w-3.5 h-3.5 text-red-400" />
-            <p className="text-[10px] text-white/40 uppercase tracking-wider">Revoked</p>
+
+        {/* Revoked */}
+        <div
+          className={`relative overflow-hidden rounded-2xl border p-5 cursor-pointer transition-all duration-200 ${
+            filterStatus === 'REVOKED'
+              ? 'bg-red-500/[0.08] border-red-500/30 shadow-lg shadow-red-500/5'
+              : 'bg-gradient-to-br from-white/[0.04] to-white/[0.01] border-white/[0.08] hover:border-red-500/20'
+          }`}
+          onClick={() => setFilterStatus(filterStatus === 'REVOKED' ? 'ALL' : 'REVOKED')}
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-full -translate-y-8 translate-x-8" />
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-9 h-9 rounded-lg bg-red-500/15 border border-red-500/20 flex items-center justify-center">
+              <XCircle className="w-4 h-4 text-red-400" />
+            </div>
+            <p className="text-xs text-white/40 font-medium uppercase tracking-wider">Revoked</p>
           </div>
-          <p className="font-display text-2xl font-bold text-red-400">{stats.revoked}</p>
-          <p className="text-[10px] text-white/30 mt-0.5">invalidated</p>
-        </div>
-        <div className="glass-card p-4 md:col-span-1 rounded-2xl border border-cyan-500/20">
-          <div className="flex items-center gap-2 mb-1">
-            <TrendingUp className="w-3.5 h-3.5 text-cyan-400" />
-            <p className="text-[10px] text-white/40 uppercase tracking-wider">Verify Rate</p>
-          </div>
-          <p className="font-display text-2xl font-bold text-cyan-400">{stats.verifyRate}%</p>
-          <p className="text-[10px] text-white/30 mt-0.5">of filtered</p>
-        </div>
-        <div className="glass-card p-4 md:col-span-1 rounded-2xl border border-white/8">
-          <div className="flex items-center gap-2 mb-1">
-            <PieChart className="w-3.5 h-3.5 text-violet-400" />
-            <p className="text-[10px] text-white/40 uppercase tracking-wider">Showing</p>
-          </div>
-          <p className="font-display text-2xl font-bold text-white/70">{filtered.length}</p>
-          <p className="text-[10px] text-white/30 mt-0.5">of {certs.length} total</p>
+          <p className="font-display text-3xl font-bold text-red-400">{stats.revoked}</p>
+          <p className="text-xs text-white/25 mt-2">Invalidated certificates</p>
         </div>
       </div>
 
-      {/* Filters row */}
-      <div className="glass-card p-4 rounded-2xl border border-white/8">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 text-white/40 text-xs shrink-0">
-            <Filter className="w-3.5 h-3.5" /> Filters
-          </div>
-
+      {/* ── Search & Filters Toolbar ── */}
+      <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           {/* Search */}
-          <div className="relative flex-1 min-w-[180px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30" />
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/25" />
             <input
-              className="input-field pl-8 py-2 text-sm h-9"
-              placeholder="Search student, course, cert ID..."
+              className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl pl-11 pr-4 py-3 text-sm text-white placeholder-white/25 focus:outline-none focus:border-purple-500/40 focus:bg-white/[0.06] transition-all duration-200"
+              placeholder="Search by student name, course, or certificate number..."
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
-          {/* Student filter */}
-          <select
-            className="input-field py-2 text-sm h-9 min-w-[150px]"
-            value={filterStudent}
-            onChange={e => setFilterStudent(e.target.value)}
+          {/* Filter toggle */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-medium transition-all duration-200 shrink-0 ${
+              showFilters || activeFiltersCount > 0
+                ? 'bg-purple-500/10 border-purple-500/25 text-purple-300'
+                : 'bg-white/[0.04] border-white/[0.08] text-white/50 hover:text-white hover:border-white/15'
+            }`}
           >
-            <option value="ALL">All Students</option>
-            {students.map(([id, name]) => (
-              <option key={id} value={id}>{name}</option>
-            ))}
-          </select>
+            <Filter className="w-4 h-4" />
+            Filters
+            {activeFiltersCount > 0 && (
+              <span className="w-5 h-5 rounded-full bg-purple-500/30 text-purple-200 text-[10px] flex items-center justify-center font-bold">
+                {activeFiltersCount}
+              </span>
+            )}
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showFilters ? 'rotate-180' : ''}`} />
+          </button>
 
-          {/* Course filter */}
-          <select
-            className="input-field py-2 text-sm h-9 min-w-[150px]"
-            value={filterCourse}
-            onChange={e => setFilterCourse(e.target.value)}
-          >
-            <option value="ALL">All Courses</option>
-            {courses.map(([id, title]) => (
-              <option key={id} value={id}>{title}</option>
-            ))}
-          </select>
-
-          {/* Status filter */}
-          <select
-            className="input-field py-2 text-sm h-9"
-            value={filterStatus}
-            onChange={e => setFilterStatus(e.target.value)}
-          >
-            <option value="ALL">All Statuses</option>
-            <option value="PENDING">Pending</option>
-            <option value="VERIFIED">Verified</option>
-            <option value="REVOKED">Revoked</option>
-          </select>
-
-          {/* Sort */}
-          <select
-            className="input-field py-2 text-sm h-9"
-            value={sortBy}
-            onChange={e => setSortBy(e.target.value as typeof sortBy)}
-          >
-            <option value="date-desc">Newest First</option>
-            <option value="date-asc">Oldest First</option>
-            <option value="name-asc">Name A–Z</option>
-            <option value="name-desc">Name Z–A</option>
-          </select>
-
-          {/* Clear filters */}
-          {(search || filterStudent !== 'ALL' || filterCourse !== 'ALL' || filterStatus !== 'ALL') && (
-            <button
-              onClick={() => { setSearch(''); setFilterStudent('ALL'); setFilterCourse('ALL'); setFilterStatus('ALL') }}
-              className="text-xs text-white/40 hover:text-white transition-colors flex items-center gap-1 shrink-0"
+          {/* Sort dropdown */}
+          <div className="relative shrink-0">
+            <select
+              className="appearance-none bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-3 pr-9 text-sm text-white/60 focus:outline-none focus:border-purple-500/40 transition-all cursor-pointer"
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value as typeof sortBy)}
+              style={{ colorScheme: 'dark' }}
             >
-              <X className="w-3.5 h-3.5" /> Clear
-            </button>
-          )}
+              <option className={dropdownOptionClassName} value="date-desc">Newest First</option>
+              <option className={dropdownOptionClassName} value="date-asc">Oldest First</option>
+              <option value="name-asc">Name A–Z</option>
+              <option value="name-desc">Name Z–A</option>
+            </select>
+            <ArrowUpDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30 pointer-events-none" />
+          </div>
         </div>
+
+        {/* Expandable filters panel */}
+        <AnimatePresence>
+          {showFilters && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
+            >
+              <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-[10px] text-white/35 uppercase tracking-wider font-medium mb-1.5 block">Student</label>
+                    <select
+                      className={filterSelectClassName}
+                      value={filterStudent}
+                      onChange={e => setFilterStudent(e.target.value)}
+                      style={{ colorScheme: 'dark' }}
+                    >
+                      <option className={dropdownOptionClassName} value="ALL">All Students</option>
+                      {students.map(([id, name]) => (
+                        <option className={dropdownOptionClassName} key={id} value={id}>{name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-white/35 uppercase tracking-wider font-medium mb-1.5 block">Course</label>
+                    <select
+                      className={filterSelectClassName}
+                      value={filterCourse}
+                      onChange={e => setFilterCourse(e.target.value)}
+                      style={{ colorScheme: 'dark' }}
+                    >
+                      <option className={dropdownOptionClassName} value="ALL">All Courses</option>
+                      {courses.map(([id, title]) => (
+                        <option className={dropdownOptionClassName} key={id} value={id}>{title}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-white/35 uppercase tracking-wider font-medium mb-1.5 block">Status</label>
+                    <select
+                      className={filterSelectClassName}
+                      value={filterStatus}
+                      onChange={e => setFilterStatus(e.target.value)}
+                      style={{ colorScheme: 'dark' }}
+                    >
+                      <option className={dropdownOptionClassName} value="ALL">All Statuses</option>
+                      <option className={dropdownOptionClassName} value="PENDING">Pending</option>
+                      <option className={dropdownOptionClassName} value="VERIFIED">Verified</option>
+                      <option className={dropdownOptionClassName} value="REVOKED">Revoked</option>
+                    </select>
+                  </div>
+                </div>
+                {activeFiltersCount > 0 && (
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
+                    <span className="text-xs text-white/30">{filtered.length} of {certs.length} certificates shown</span>
+                    <button
+                      onClick={clearAllFilters}
+                      className="text-xs text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1"
+                    >
+                      <X className="w-3 h-3" /> Clear all filters
+                    </button>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* Bulk action bar */}
+      {/* ── Bulk Action Bar ── */}
       <AnimatePresence>
         {someSelected && (
-          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-            className="flex items-center gap-4 px-5 py-3 rounded-2xl bg-purple-500/10 border border-purple-500/30">
-            <span className="text-sm font-medium text-purple-300">
-              {selectedIds.size} selected
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="flex items-center gap-3 px-5 py-3.5 rounded-xl bg-purple-500/[0.08] border border-purple-500/20 backdrop-blur-sm"
+          >
+            <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
+              <CheckCheck className="w-4 h-4 text-purple-300" />
+            </div>
+            <span className="text-sm font-medium text-purple-200">
+              {selectedIds.size} certificate{selectedIds.size > 1 ? 's' : ''} selected
             </span>
-            <span className="text-white/20">|</span>
+            <div className="h-5 w-px bg-white/10 mx-1" />
             <button
               onClick={handleBulkVerify}
               disabled={bulkLoading || selectedPendingCount === 0}
-              className="flex items-center gap-2 text-sm font-medium text-green-300 hover:text-green-200 disabled:opacity-40 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500/15 border border-emerald-500/25 text-sm font-medium text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-30 transition-all"
             >
-              {bulkLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-              Verify {selectedPendingCount > 0 ? `${selectedPendingCount} selected` : 'selected'}
+              {bulkLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+              Verify {selectedPendingCount > 0 ? selectedPendingCount : ''} Selected
             </button>
             <button onClick={() => setSelectedIds(new Set())}
-              className="ml-auto text-xs text-white/30 hover:text-white transition-colors flex items-center gap-1">
-              <X className="w-3.5 h-3.5" /> Deselect all
+              className="ml-auto text-xs text-white/30 hover:text-white/60 transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-white/5">
+              <X className="w-3.5 h-3.5" /> Deselect
             </button>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Table */}
+      {/* ── Certificates Table ── */}
       {loading ? (
-        <div className="flex justify-center py-16"><Loader2 className="w-7 h-7 animate-spin text-purple-400" /></div>
+        <div className="flex flex-col items-center justify-center py-20 gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+            <Loader2 className="w-6 h-6 animate-spin text-purple-400" />
+          </div>
+          <p className="text-sm text-white/30">Loading certificates...</p>
+        </div>
       ) : filtered.length === 0 ? (
-        <div className="glass-card p-16 text-center text-white/30">
-          <Award className="w-10 h-10 mx-auto mb-3 opacity-20" />
-          <p>No certificates found</p>
+        <div className="flex flex-col items-center justify-center py-20 gap-4">
+          <div className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center">
+            <Award className="w-8 h-8 text-white/15" />
+          </div>
+          <div className="text-center">
+            <p className="text-white/40 font-medium">No certificates found</p>
+            <p className="text-sm text-white/20 mt-1">
+              {activeFiltersCount > 0 ? 'Try adjusting your filters' : 'Certificates will appear here once students complete courses'}
+            </p>
+          </div>
+          {activeFiltersCount > 0 && (
+            <button onClick={clearAllFilters}
+              className="text-sm text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1.5 mt-2">
+              <X className="w-4 h-4" /> Clear all filters
+            </button>
+          )}
         </div>
       ) : (
-        <div className="glass-card overflow-hidden">
+        <div className="rounded-2xl bg-white/[0.02] border border-white/[0.06] overflow-hidden">
+          {/* Table header info */}
+          <div className="px-5 py-3 border-b border-white/[0.05] flex items-center justify-between">
+            <p className="text-xs text-white/30">
+              Showing <span className="text-white/50 font-medium">{filtered.length}</span> of {certs.length} certificates
+            </p>
+          </div>
+
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b border-white/8">
-                <tr className="text-left text-white/40 text-xs">
-                  <th className="px-4 py-3">
+              <thead>
+                <tr className="border-b border-white/[0.06]">
+                  <th className="px-5 py-3.5 text-left">
                     <input type="checkbox" checked={allSelected} onChange={toggleSelectAll}
-                      className="rounded border-white/20 bg-white/5 text-purple-500 cursor-pointer" />
+                      className="rounded border-white/20 bg-white/5 text-purple-500 cursor-pointer focus:ring-purple-500/30 focus:ring-offset-0" />
                   </th>
-                  <th className="px-4 py-3 font-medium">Student</th>
-                  <th className="px-4 py-3 font-medium">Course</th>
-                  <th className="px-4 py-3 font-medium">
+                  <th className="px-5 py-3.5 text-left text-[10px] text-white/35 uppercase tracking-wider font-semibold">Student</th>
+                  <th className="px-5 py-3.5 text-left text-[10px] text-white/35 uppercase tracking-wider font-semibold">Course</th>
+                  <th className="px-5 py-3.5 text-left text-[10px] text-white/35 uppercase tracking-wider font-semibold hidden lg:table-cell">Certificate No.</th>
+                  <th className="px-5 py-3.5 text-left">
                     <button onClick={() => setSortBy(sortBy === 'date-desc' ? 'date-asc' : 'date-desc')}
-                      className="flex items-center gap-1 hover:text-white transition-colors">
+                      className="flex items-center gap-1.5 text-[10px] text-white/35 uppercase tracking-wider font-semibold hover:text-white/60 transition-colors">
                       Issued <ArrowUpDown className="w-3 h-3" />
                     </button>
                   </th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Actions</th>
+                  <th className="px-5 py-3.5 text-left text-[10px] text-white/35 uppercase tracking-wider font-semibold">Status</th>
+                  <th className="px-5 py-3.5 text-right text-[10px] text-white/35 uppercase tracking-wider font-semibold">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5">
+              <tbody>
                 {filtered.map((cert, i) => {
                   const style = STATUS_STYLES[cert.status]
                   const Icon = style.icon
                   const isSelected = selectedIds.has(cert.id)
+                  const isExpanded = expandedRow === cert.id
                   return (
-                    <motion.tr key={cert.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.02 }}
-                      className={`hover:bg-white/2 transition-colors ${isSelected ? 'bg-purple-500/5' : ''}`}>
-                      <td className="px-4 py-4">
+                    <motion.tr
+                      key={cert.id}
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: Math.min(i * 0.015, 0.3) }}
+                      className={`group border-b border-white/[0.03] last:border-0 transition-colors duration-150 ${
+                        isSelected ? 'bg-purple-500/[0.06]' : 'hover:bg-white/[0.02]'
+                      }`}
+                    >
+                      <td className="px-5 py-4">
                         <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(cert.id)}
-                          className="rounded border-white/20 bg-white/5 text-purple-500 cursor-pointer" />
+                          className="rounded border-white/20 bg-white/5 text-purple-500 cursor-pointer focus:ring-purple-500/30 focus:ring-offset-0" />
                       </td>
-                      <td className="px-4 py-4">
+                      <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-cyan-500 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-600/80 to-cyan-500/80 flex items-center justify-center text-xs font-bold flex-shrink-0 ring-2 ring-white/5">
                             {cert.user.name[0].toUpperCase()}
                           </div>
-                          <div>
-                            <Link href={`/admin/students/${cert.user.id}`} className="font-medium hover:text-purple-300 transition-colors">
+                          <div className="min-w-0">
+                            <Link href={`/admin/students/${cert.user.id}`}
+                              className="font-medium text-white/90 hover:text-purple-300 transition-colors block truncate">
                               {cert.user.name}
                             </Link>
-                            <p className="text-xs text-white/30">{cert.user.phone}</p>
+                            <p className="text-xs text-white/25 mt-0.5">{cert.user.phone}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-4">
-                        <p className="font-medium truncate max-w-[180px]">{cert.course.title}</p>
-                        <p className="text-xs text-white/30">{cert.course.category}</p>
+                      <td className="px-5 py-4">
+                        <div className="min-w-0">
+                          <p className="font-medium text-white/80 truncate max-w-[200px]">{cert.course.title}</p>
+                          <span className="inline-block mt-1 px-2 py-0.5 rounded-md bg-white/[0.04] text-[10px] text-white/30 font-medium uppercase tracking-wider">
+                            {cert.course.category}
+                          </span>
+                        </div>
                       </td>
-                      <td className="px-4 py-4 text-white/50 text-xs whitespace-nowrap">
-                        {new Date(cert.issuedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      <td className="px-5 py-4 hidden lg:table-cell">
+                        <div className="flex items-center gap-2">
+                          <code className="text-xs text-white/40 font-mono bg-white/[0.04] px-2 py-1 rounded-md">
+                            {cert.certificateNo}
+                          </code>
+                          <button onClick={() => copyVerifyLink(cert)} title="Copy verification link"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-white/5 text-white/30 hover:text-white">
+                            {copied === cert.id ? <CheckCheck className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
                       </td>
-                      <td className="px-4 py-4">
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-2 text-white/40">
+                          <Calendar className="w-3.5 h-3.5 text-white/20" />
+                          <span className="text-xs whitespace-nowrap">
+                            {new Date(cert.issuedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-4">
                         <div>
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${style.cls}`}>
-                            <Icon className={`w-3 h-3 ${style.iconCls}`} />
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border ${style.cls}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
                             {style.label}
                           </span>
                           {cert.status === 'REVOKED' && cert.revokedReason && (
-                            <p className="text-xs text-red-400/60 mt-1 max-w-[140px] truncate" title={cert.revokedReason}>
+                            <p className="text-[10px] text-red-400/50 mt-1.5 max-w-[140px] truncate" title={cert.revokedReason}>
                               {cert.revokedReason}
                             </p>
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-2">
+                      <td className="px-5 py-4">
+                        <div className="flex items-center justify-end gap-1">
                           <button onClick={() => copyVerifyLink(cert)} title="Copy verification link"
-                            className="p-1.5 rounded-lg hover:bg-white/8 transition-colors text-white/30 hover:text-white">
-                            {copied === cert.id ? <CheckCheck className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+                            className="p-2 rounded-lg hover:bg-white/[0.06] transition-all text-white/25 hover:text-white lg:hidden">
+                            {copied === cert.id ? <CheckCheck className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                           </button>
                           <a href={`/verify/${cert.certificateNo}`} target="_blank" rel="noopener noreferrer"
                             title="Open verification page"
-                            className="p-1.5 rounded-lg hover:bg-white/8 transition-colors text-white/30 hover:text-white">
+                            className="p-2 rounded-lg hover:bg-white/[0.06] transition-all text-white/25 hover:text-white">
                             <ExternalLink className="w-4 h-4" />
                           </a>
                           {cert.status !== 'VERIFIED' && (
                             <button onClick={() => handleVerify(cert)} disabled={actionLoading === cert.id}
-                              title="Mark as verified"
-                              className="p-1.5 rounded-lg hover:bg-green-500/15 transition-colors text-white/30 hover:text-green-400 disabled:opacity-40">
+                              title="Verify certificate"
+                              className="p-2 rounded-lg hover:bg-emerald-500/10 transition-all text-white/25 hover:text-emerald-400 disabled:opacity-30">
                               {actionLoading === cert.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                             </button>
                           )}
                           {cert.status !== 'REVOKED' && (
                             <button onClick={() => { setRevokeTarget(cert); setRevokeReason('') }}
                               title="Revoke certificate"
-                              className="p-1.5 rounded-lg hover:bg-red-500/15 transition-colors text-white/30 hover:text-red-400">
+                              className="p-2 rounded-lg hover:bg-red-500/10 transition-all text-white/25 hover:text-red-400">
                               <XCircle className="w-4 h-4" />
                             </button>
                           )}
                           {cert.status === 'REVOKED' && (
                             <button onClick={() => handleVerify(cert)} disabled={actionLoading === cert.id}
-                              title="Restore as verified"
-                              className="p-1.5 rounded-lg hover:bg-amber-500/15 transition-colors text-white/30 hover:text-amber-400 disabled:opacity-40">
+                              title="Restore certificate"
+                              className="p-2 rounded-lg hover:bg-amber-500/10 transition-all text-white/25 hover:text-amber-400 disabled:opacity-30">
                               <RotateCcw className="w-4 h-4" />
                             </button>
                           )}
@@ -478,54 +673,103 @@ export default function AdminCertificatesPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Table footer */}
+          <div className="px-5 py-3 border-t border-white/[0.05] flex items-center justify-between">
+            <p className="text-xs text-white/25">
+              {someSelected
+                ? `${selectedIds.size} of ${filtered.length} selected`
+                : `${filtered.length} certificate${filtered.length !== 1 ? 's' : ''}`
+              }
+            </p>
+            <div className="flex items-center gap-3 text-xs text-white/25">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" /> {stats.verified} verified
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-400" /> {stats.pending} pending
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-red-400" /> {stats.revoked} revoked
+              </span>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Revoke Modal */}
+      {/* ── Revoke Modal ── */}
       <AnimatePresence>
         {revokeTarget && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4"
             onClick={() => setRevokeTarget(null)}>
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-              className="glass-card border border-red-500/30 p-6 rounded-2xl w-full max-w-md"
-              onClick={e => e.stopPropagation()}>
-              <div className="flex items-center justify-between mb-5">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center">
-                    <XCircle className="w-5 h-5 text-red-400" />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 10 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="bg-[#0c0c14] border border-red-500/20 p-0 rounded-2xl w-full max-w-md shadow-2xl shadow-red-500/5 overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Modal header */}
+              <div className="px-6 pt-6 pb-4 border-b border-white/[0.06]">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+                      <XCircle className="w-5 h-5 text-red-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-display font-bold text-lg">Revoke Certificate</h3>
+                      <p className="text-xs text-white/35 mt-0.5">This action will invalidate the certificate</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-display font-bold">Revoke Certificate</h3>
-                    <p className="text-xs text-white/40">This will mark the certificate as invalid</p>
-                  </div>
+                  <button onClick={() => setRevokeTarget(null)}
+                    className="p-2 rounded-lg hover:bg-white/5 text-white/30 hover:text-white transition-colors">
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
-                <button onClick={() => setRevokeTarget(null)} className="text-white/30 hover:text-white">
-                  <X className="w-5 h-5" />
-                </button>
               </div>
-              <div className="p-3 rounded-xl bg-white/3 border border-white/8 mb-4 text-sm">
-                <p className="font-medium">{revokeTarget.user.name}</p>
-                <p className="text-white/40 text-xs">{revokeTarget.course.title}</p>
+
+              {/* Modal body */}
+              <div className="px-6 py-5 space-y-5">
+                {/* Certificate info card */}
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600/80 to-cyan-500/80 flex items-center justify-center text-sm font-bold flex-shrink-0 ring-2 ring-white/5">
+                    {revokeTarget.user.name[0].toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-white/90 truncate">{revokeTarget.user.name}</p>
+                    <p className="text-xs text-white/35 truncate">{revokeTarget.course.title}</p>
+                  </div>
+                  <code className="text-[10px] text-white/25 font-mono bg-white/[0.04] px-2 py-1 rounded-md shrink-0">
+                    {revokeTarget.certificateNo}
+                  </code>
+                </div>
+
+                {/* Reason input */}
+                <div>
+                  <label className="text-xs text-white/45 font-medium mb-2 block">
+                    Reason for revocation <span className="text-red-400">*</span>
+                  </label>
+                  <textarea
+                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-red-500/40 focus:bg-white/[0.06] transition-all duration-200 resize-none h-28"
+                    placeholder="e.g. Fraudulent submission, plagiarism detected, identity mismatch..."
+                    value={revokeReason}
+                    onChange={e => setRevokeReason(e.target.value)}
+                    autoFocus
+                  />
+                </div>
               </div>
-              <div className="mb-5">
-                <label className="text-xs text-white/50 mb-1.5 block">Reason for revocation *</label>
-                <textarea
-                  className="input-field resize-none h-24 text-sm"
-                  placeholder="e.g. Fraudulent submission, plagiarism detected..."
-                  value={revokeReason}
-                  onChange={e => setRevokeReason(e.target.value)}
-                  autoFocus
-                />
-              </div>
-              <div className="flex gap-3">
+
+              {/* Modal footer */}
+              <div className="px-6 pb-6 flex gap-3">
                 <button onClick={() => setRevokeTarget(null)}
-                  className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm text-white/50 hover:text-white hover:border-white/20 transition-all">
+                  className="flex-1 py-3 rounded-xl border border-white/[0.08] text-sm text-white/50 font-medium hover:text-white hover:bg-white/[0.04] hover:border-white/15 transition-all">
                   Cancel
                 </button>
                 <button onClick={handleRevoke}
                   disabled={!revokeReason.trim() || actionLoading === revokeTarget.id}
-                  className="flex-1 py-2.5 rounded-xl bg-red-500/20 border border-red-500/30 text-red-300 text-sm font-medium hover:bg-red-500/30 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+                  className="flex-1 py-3 rounded-xl bg-red-500/15 border border-red-500/25 text-red-300 text-sm font-semibold hover:bg-red-500/25 transition-all disabled:opacity-30 flex items-center justify-center gap-2">
                   {actionLoading === revokeTarget.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
                   Revoke Certificate
                 </button>
