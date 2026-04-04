@@ -1,5 +1,3 @@
-const path = require('path')
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
@@ -8,13 +6,8 @@ const nextConfig = {
       { protocol: 'https', hostname: 'i.ytimg.com' },
     ],
   },
-  experimental: {
-    serverComponentsExternalPackages: ['@prisma/client'],
-  },
-  webpack: (config) => {
-    config.resolve.alias['@'] = path.resolve(__dirname, 'src')
-    return config
-  },
+  // serverExternalPackages replaces the deprecated experimental.serverComponentsExternalPackages
+  serverExternalPackages: ['@prisma/client'],
 }
 
 module.exports = nextConfig

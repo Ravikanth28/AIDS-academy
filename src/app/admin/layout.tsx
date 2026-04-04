@@ -19,6 +19,7 @@ import {
   Award,
   KeyRound,
 } from 'lucide-react'
+import { ThemeToggle } from '@/components/ThemeToggle'
 
 const navItems = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
@@ -124,13 +125,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </div>
             </div>
           )}
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 w-full px-4 py-2.5 rounded-xl text-sm text-white/50 hover:text-red-400 hover:bg-red-500/10 transition-all"
-          >
-            <LogOut className="w-4 h-4" />
-            Sign Out
-          </button>
+          <div className="flex items-center gap-2 mb-1">
+            <ThemeToggle />
+            <button
+              onClick={handleLogout}
+              className="flex-1 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm text-white/50 hover:text-red-400 hover:bg-red-500/10 transition-all"
+            >
+              <LogOut className="w-4 h-4" />
+              Sign Out
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -142,7 +146,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <Menu className="w-5 h-5" />
           </button>
           <span className="font-display font-bold text-sm gradient-text">AI·DS Admin</span>
-          <div className="w-9" />
+          <ThemeToggle />
         </header>
 
         <main className="flex-1 p-3 sm:p-6">

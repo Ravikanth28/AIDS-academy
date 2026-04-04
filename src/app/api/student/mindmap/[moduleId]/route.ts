@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/middleware-helpers'
 import { getTranscript, transcriptToText } from '@/lib/youtube'
 import { chatCompletion } from '@/lib/ai'
+import { getCached, setCached } from '@/lib/cache'
 
 // POST: Generate mind map data from module video transcripts
 export async function POST(req: NextRequest, { params }: { params: { moduleId: string } }) {
@@ -19,22 +20,26 @@ export async function POST(req: NextRequest, { params }: { params: { moduleId: s
     })
     if (!module_) return NextResponse.json({ error: 'Module not found' }, { status: 404 })
 
-    // Gather transcripts
-    let topicContext = ''
-    let transcriptCount = 0
+    // Return cached result if available (1 hour TTL)
+    const cacheKey = `mindmap:${params.moduleId}`
+    const cached = getCached(cacheKey)
+    if (cached) return NextResponse.json(JSON.parse(cached))
 
-    for (const video of module_.videos) {
-      try {
-        const segments = await getTranscript(video.youtubeUrl)
-        const text = transcriptToText(segments)
-        if (text) {
-          topicContext += `\n\nVideo "${video.title}":\n${text.slice(0, 2000)}`
-          transcriptCount++
+    // Gather transcripts in parallel
+    const transcriptResults = await Promise.all(
+      module_.videos.map(async (video) => {
+        try {
+          const segments = await getTranscript(video.youtubeUrl)
+          const text = transcriptToText(segments)
+          return text ? `\n\nVideo "${video.title}":\n${text.slice(0, 2000)}` : null
+        } catch {
+          return null
         }
-      } catch {
-        // skip
-      }
-    }
+      })
+    )
+    const validTranscripts = transcriptResults.filter((t): t is string => t !== null)
+    const topicContext = validTranscripts.join('')
+    const transcriptCount = validTranscripts.length
 
     if (transcriptCount === 0) {
       return NextResponse.json({
@@ -85,10 +90,9 @@ ${trimmed}`
     }
 
     const mindmap = JSON.parse(jsonMatch[0])
-    return NextResponse.json({
-      mindmap,
-      moduleTitle: module_.title,
-    })
+    const result = { mindmap, moduleTitle: module_.title }
+    setCached(cacheKey, JSON.stringify(result))
+    return NextResponse.json(result)
   } catch (err) {
     console.error('Mind map error:', err)
     return NextResponse.json({ error: 'Failed to generate mind map' }, { status: 500 })

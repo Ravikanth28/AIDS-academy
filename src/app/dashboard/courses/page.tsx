@@ -1,14 +1,18 @@
 ﻿'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { motion } from 'framer-motion'
 import {
   BookOpen, Users, ChevronRight, Plus, Loader2,
   CheckCircle, PlayCircle, HelpCircle, Layers, Search,
-  Filter, Clock, Trophy,
+  Filter, Clock, Trophy, X,
 } from 'lucide-react'
+import { Pagination } from '@/components/Pagination'
+import { getCourseThumbnailUrl } from '@/lib/utils'
+
+const COURSES_PER_PAGE = 12
 
 interface Course {
   id: string
@@ -72,6 +76,8 @@ export default function StudentCoursesPage() {
   const [enrolling, setEnrolling] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState<FilterTab>('all')
+  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     Promise.all([
@@ -128,13 +134,25 @@ export default function StudentCoursesPage() {
     completed: available.filter(c => isCompleted(c.id)).length,
   }
 
+  const categories = useMemo(() =>
+    Array.from(new Set(available.map(c => c.category).filter(Boolean))).sort()
+  , [available])
+
   const filtered = available.filter(c => {
     const matchSearch = c.title.toLowerCase().includes(search.toLowerCase()) || c.category?.toLowerCase().includes(search.toLowerCase())
-    if (!matchSearch) return false
+    const matchCat = categoryFilter === 'all' || c.category === categoryFilter
+    if (!matchSearch || !matchCat) return false
     if (tab === 'inprogress') return isInProgress(c.id)
     if (tab === 'completed') return isCompleted(c.id)
     return true
   })
+
+  // Reset page when filters change
+  const filterKey = search + tab + categoryFilter
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey)
+  if (filterKey !== prevFilterKey) { setPrevFilterKey(filterKey); if (page !== 1) setPage(1) }
+
+  const paginated = filtered.slice((page - 1) * COURSES_PER_PAGE, page * COURSES_PER_PAGE)
 
   if (loading) return (
     <div className="flex justify-center py-20">
@@ -156,7 +174,7 @@ export default function StudentCoursesPage() {
         <p className="text-white/40 mt-1">Enroll in courses and start learning</p>
       </div>
 
-      {/* Search + Filter row */}
+      {/* Search + Category Filter + Filter tabs */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
@@ -166,7 +184,29 @@ export default function StudentCoursesPage() {
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
+
+        {categories.length > 1 && (
+          <div className="relative">
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30 pointer-events-none" />
+            <select
+              value={categoryFilter}
+              onChange={e => setCategoryFilter(e.target.value)}
+              className="bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white/70 focus:outline-none focus:border-purple-500/40 transition-all appearance-none cursor-pointer hover:bg-white/8 h-full"
+              style={{ colorScheme: 'dark' }}
+            >
+              <option value="all">All Categories</option>
+              {categories.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Filter tabs */}
         <div className="flex gap-1.5 p-1 rounded-xl bg-white/5 border border-white/8">
@@ -206,8 +246,9 @@ export default function StudentCoursesPage() {
           {tab === 'completed' && <p className="text-white/20 text-sm mt-1">Complete all modules to earn your certificate</p>}
         </motion.div>
       ) : (
+        <>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {filtered.map((course, i) => {
+          {paginated.map((course, i) => {
             const cat = getCat(course.category)
             const isEnrolled = enrolledIds.has(course.id)
             const completed = isCompleted(course.id)
@@ -235,8 +276,8 @@ export default function StudentCoursesPage() {
 
                 {/* Thumbnail */}
                 <div className="relative h-36 overflow-hidden">
-                  {course.thumbnail ? (
-                    <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover" />
+                  {getCourseThumbnailUrl(course.thumbnail) ? (
+                    <img src={getCourseThumbnailUrl(course.thumbnail)!} alt={course.title} className="w-full h-full object-cover" />
                   ) : (
                     <div className={`w-full h-full bg-gradient-to-br ${cat.gradient} opacity-20`} />
                   )}
@@ -333,6 +374,13 @@ export default function StudentCoursesPage() {
             )
           })}
         </div>
+        <Pagination
+          page={page}
+          total={filtered.length}
+          perPage={COURSES_PER_PAGE}
+          onChange={setPage}
+        />
+        </>
       )}
     </div>
   )

@@ -2,20 +2,23 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/middleware-helpers'
 
 const WANDBOX_COMPILERS: Record<string, { compiler: string; options?: string }> = {
-  python:     { compiler: 'cpython-3.12.0' },
-  javascript: { compiler: 'nodejs-20.6.1' },
-  typescript: { compiler: 'typescript-5.1.6' },
-  java:       { compiler: 'openjdk-21.0.1' },
+  python:     { compiler: 'cpython-3.12.7' },
+  javascript: { compiler: 'nodejs-20.17.0' },
+  typescript: { compiler: 'typescript-5.6.2' },
+  java:       { compiler: 'openjdk-jdk-21+35' },
   cpp:        { compiler: 'gcc-13.2.0', options: '-std=c++17 -O2' },
+  c:          { compiler: 'gcc-13.2.0-c', options: '-std=c11 -O2' },
 }
 
+const WANDBOX_TIMEOUT_MS = 15_000
+
 export async function POST(req: NextRequest) {
-  const authResult = await requireAuth(req)
-  if (authResult instanceof NextResponse) return authResult
+  const { error } = await requireAuth(req)
+  if (error) return error
 
-  const { language, code } = await req.json()
+  const { language, code, stdin } = await req.json()
 
-  if (language === 'sql' || !WANDBOX_COMPILERS[language]) {
+  if (language === 'sql' || !WANDBOX_COMPILERS[language as string]) {
     return NextResponse.json({
       output: '',
       stderr: 'SQL queries cannot be run directly — AI evaluation will assess your query on submission.',
@@ -36,12 +39,22 @@ export async function POST(req: NextRequest) {
       save: false,
     }
     if (cfg.options) body.options = cfg.options
+    if (stdin?.trim()) body.stdin = stdin
 
-    const res = await fetch('https://wandbox.org/api/compile.json', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), WANDBOX_TIMEOUT_MS)
+
+    let res: Response
+    try {
+      res = await fetch('https://wandbox.org/api/compile.json', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      })
+    } finally {
+      clearTimeout(timeoutId)
+    }
 
     if (!res.ok) {
       const text = await res.text()
@@ -54,7 +67,10 @@ export async function POST(req: NextRequest) {
     const stderr   = [data.compiler_error, data.program_error].filter(Boolean).join('\n')
 
     return NextResponse.json({ output, stderr, exitCode })
-  } catch {
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      return NextResponse.json({ output: '', stderr: 'Execution timed out (15s). Your code may have an infinite loop.', exitCode: 1 })
+    }
     return NextResponse.json({ output: '', stderr: 'Could not connect to execution server.', exitCode: 1 })
   }
 }

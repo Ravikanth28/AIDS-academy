@@ -206,3 +206,130 @@
   0% { transform: rotate(0deg) translateX(60px) rotate(0deg); }
   100% { transform: rotate(360deg) translateX(60px) rotate(-360deg); }
 }
+
+/* ============================================================
+   LIGHT MODE OVERRIDES
+   Applied when  <html class="light">  is set by ThemeProvider
+   ============================================================ */
+
+html.light {
+  color-scheme: light;
+}
+
+html.light body {
+  background-color: #f3f4ff;
+  color: #1a1a2e;
+}
+
+/* --- Structural dark backgrounds --- */
+html.light .bg-dark          { background-color: #f3f4ff !important; }
+html.light .bg-dark-100      { background-color: #ebebfc !important; }
+html.light .bg-dark-200      { background-color: #e3e3f8 !important; }
+html.light .bg-dark-300      { background-color: #d9d9f3 !important; }
+html.light .bg-dark-400      { background-color: #ceceee !important; }
+
+/* --- Text colors --- */
+html.light .text-white        { color: #1a1a2e !important; }
+html.light .text-white\/80    { color: rgba(26,26,46,0.85) !important; }
+html.light .text-white\/70    { color: rgba(26,26,46,0.75) !important; }
+html.light .text-white\/60    { color: rgba(26,26,46,0.65) !important; }
+html.light .text-white\/50    { color: rgba(26,26,46,0.55) !important; }
+html.light .text-white\/40    { color: rgba(26,26,46,0.50) !important; }
+html.light .text-white\/30    { color: rgba(26,26,46,0.40) !important; }
+html.light .text-white\/25    { color: rgba(26,26,46,0.35) !important; }
+html.light .text-white\/20    { color: rgba(26,26,46,0.30) !important; }
+
+/* --- Border colors --- */
+html.light .border-white\/5   { border-color: rgba(100,80,200,0.10) !important; }
+html.light .border-white\/8   { border-color: rgba(100,80,200,0.12) !important; }
+html.light .border-white\/10  { border-color: rgba(100,80,200,0.15) !important; }
+html.light .border-white\/15  { border-color: rgba(100,80,200,0.20) !important; }
+html.light .border-white\/20  { border-color: rgba(100,80,200,0.25) !important; }
+
+/* --- Semi-transparent white fills --- */
+html.light .bg-white\/3       { background-color: rgba(100,80,200,0.04) !important; }
+html.light .bg-white\/5       { background-color: rgba(100,80,200,0.06) !important; }
+html.light .bg-white\/\[0\.03\]  { background-color: rgba(100,80,200,0.04) !important; }
+html.light .bg-white\/\[0\.06\]  { background-color: rgba(100,80,200,0.08) !important; }
+html.light .bg-white\/8       { background-color: rgba(100,80,200,0.08) !important; }
+html.light .bg-white\/10      { background-color: rgba(100,80,200,0.10) !important; }
+html.light .bg-white\/15      { background-color: rgba(100,80,200,0.15) !important; }
+
+/* --- Glass cards --- */
+html.light .glass-card {
+  background: rgba(255, 255, 255, 0.82) !important;
+  border-color: rgba(110, 86, 207, 0.14) !important;
+  box-shadow: 0 2px 16px rgba(100, 80, 200, 0.06) !important;
+  backdrop-filter: blur(12px) !important;
+}
+html.light .glass-card-hover {
+  background: rgba(255, 255, 255, 0.82) !important;
+  border-color: rgba(110, 86, 207, 0.14) !important;
+}
+html.light .glass-card-hover:hover {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: rgba(124, 58, 237, 0.30) !important;
+  box-shadow: 0 4px 24px rgba(100, 80, 200, 0.12) !important;
+}
+
+/* --- Input fields --- */
+html.light .input-field {
+  background-color: rgba(255, 255, 255, 0.92) !important;
+  border-color: rgba(110, 86, 207, 0.22) !important;
+  color: #1a1a2e !important;
+}
+html.light .input-field::placeholder { color: rgba(26, 26, 46, 0.38) !important; }
+html.light .input-field:focus {
+  background-color: #fff !important;
+  border-color: rgba(124, 58, 237, 0.50) !important;
+}
+html.light select.input-field,
+html.light select.input-field option {
+  background-color: #fff !important;
+  color: #1a1a2e !important;
+}
+
+/* --- Sidebar & header surfaces --- */
+html.light aside {
+  background-color: #ffffff !important;
+  border-right-color: rgba(100, 80, 200, 0.12) !important;
+}
+html.light header {
+  background-color: #f3f4ff !important;
+  border-bottom-color: rgba(100, 80, 200, 0.10) !important;
+}
+
+/* --- Nav items --- */
+html.light nav a { color: rgba(26,26,46,0.55) !important; }
+html.light nav a:hover { color: #1a1a2e !important; background-color: rgba(100,80,200,0.07) !important; }
+html.light nav a.bg-purple-500\/20 { background-color: rgba(124,58,237,0.12) !important; color: #6d28d9 !important; border-color: rgba(124,58,237,0.25) !important; }
+
+/* --- Hover fill variants in tables/lists --- */
+html.light .hover\:bg-white\/3:hover  { background-color: rgba(100,80,200,0.04) !important; }
+html.light .hover\:bg-white\/5:hover  { background-color: rgba(100,80,200,0.06) !important; }
+html.light .hover\:bg-white\/10:hover { background-color: rgba(100,80,200,0.10) !important; }
+html.light .hover\:bg-white\/15:hover { background-color: rgba(100,80,200,0.15) !important; }
+
+/* --- Scrollbar --- */
+html.light ::-webkit-scrollbar-track { background: #ebebfc; }
+html.light ::-webkit-scrollbar-thumb { background: rgba(124, 58, 237, 0.22); }
+html.light ::-webkit-scrollbar-thumb:hover { background: rgba(124, 58, 237, 0.42); }
+
+/* --- Dividers --- */
+html.light .divide-white\/5 > * + * { border-color: rgba(100,80,200,0.10) !important; }
+html.light .divide-white\/8 > * + * { border-color: rgba(100,80,200,0.12) !important; }
+
+/* --- Table --- */
+html.light thead tr { border-bottom-color: rgba(100,80,200,0.12) !important; }
+html.light tbody tr:hover { background-color: rgba(100,80,200,0.04) !important; }
+
+/* --- Btn secondary --- */
+html.light .btn-secondary {
+  background-color: rgba(255,255,255,0.80) !important;
+  border-color: rgba(110,86,207,0.22) !important;
+  color: #1a1a2e !important;
+}
+html.light .btn-secondary:hover {
+  background-color: #fff !important;
+  border-color: rgba(124,58,237,0.40) !important;
+}

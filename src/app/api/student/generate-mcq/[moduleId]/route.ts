@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/middleware-helpers'
 import { getTranscript, transcriptToText } from '@/lib/youtube'
 import { chatCompletion } from '@/lib/ai'
+import { getCached, setCached } from '@/lib/cache'
 
 // POST: Generate MCQ questions from module video transcripts
 export async function POST(req: NextRequest, { params }: { params: { moduleId: string } }) {
@@ -20,21 +21,21 @@ export async function POST(req: NextRequest, { params }: { params: { moduleId: s
       return NextResponse.json({ error: 'No videos in this module' }, { status: 400 })
     }
 
-    // Gather transcripts from all videos
-    const transcripts: string[] = []
-    let transcriptCount = 0
-    for (const video of module_.videos) {
-      try {
-        const segments = await getTranscript(video.youtubeUrl)
-        const text = transcriptToText(segments)
-        if (text) {
-          transcripts.push(`Video: ${video.title}\n${text}`)
-          transcriptCount++
+    // Gather transcripts from all videos in parallel
+    const transcriptResults = await Promise.all(
+      module_.videos.map(async (video) => {
+        try {
+          const segments = await getTranscript(video.youtubeUrl)
+          const text = transcriptToText(segments)
+          return text ? `Video: ${video.title}\n${text}` : null
+        } catch (err) {
+          console.warn(`Could not fetch transcript for ${video.title}:`, err)
+          return null
         }
-      } catch (err) {
-        console.warn(`Could not fetch transcript for ${video.title}:`, err)
-      }
-    }
+      })
+    )
+    const transcripts = transcriptResults.filter((t): t is string => t !== null)
+    const transcriptCount = transcripts.length
 
     if (transcriptCount === 0) {
       return NextResponse.json({
@@ -52,6 +53,11 @@ export async function POST(req: NextRequest, { params }: { params: { moduleId: s
 
     const body = await req.json().catch(() => ({}))
     const count = Math.min(Math.max(body.count || 5, 1), 20)
+
+    // Return cached result if available (1 hour TTL)
+    const cacheKey = `mcq:${params.moduleId}:${count}`
+    const cached = getCached(cacheKey)
+    if (cached) return NextResponse.json(JSON.parse(cached))
 
     const systemPrompt = `You are an expert educator. Generate multiple-choice quiz questions from video lecture transcripts. 
 Return ONLY valid JSON array. Each question must have exactly 4 options with exactly 1 correct answer.
@@ -85,7 +91,9 @@ ${trimmed}`
     }
 
     const questions = JSON.parse(jsonMatch[0])
-    return NextResponse.json({ questions, moduleTitle: module_.title })
+    const result = { questions, moduleTitle: module_.title }
+    setCached(cacheKey, JSON.stringify(result))
+    return NextResponse.json(result)
   } catch (err) {
     console.error('Generate MCQ error:', err)
     return NextResponse.json({ error: 'Failed to generate questions' }, { status: 500 })

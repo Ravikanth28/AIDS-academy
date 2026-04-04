@@ -1,24 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getSessionFromRequest } from '@/lib/auth'
+import { requireAuth } from '@/lib/middleware-helpers'
 
 export async function GET(req: NextRequest) {
-  const session = await getSessionFromRequest(req)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { session, error } = await requireAuth(req)
+  if (error) return error
 
   const { searchParams } = new URL(req.url)
   const now = new Date()
   const month = parseInt(searchParams.get('month') ?? String(now.getMonth() + 1))
   const year = parseInt(searchParams.get('year') ?? String(now.getFullYear()))
 
-  const rows = await prisma.monthlyPoints.findMany({
-    where: { month, year, user: { role: 'STUDENT' } },
-    orderBy: { points: 'desc' },
-    include: {
-      user: { select: { id: true, name: true } },
-    },
-    take: 20,
-  })
+  // Run all queries in parallel
+  const [rows, myEntry, totalParticipants] = await Promise.all([
+    prisma.monthlyPoints.findMany({
+      where: { month, year, user: { role: 'STUDENT' } },
+      orderBy: { points: 'desc' },
+      include: { user: { select: { id: true, name: true } } },
+      take: 20,
+    }),
+    prisma.monthlyPoints.findUnique({
+      where: { userId_month_year: { userId: session.userId, month, year } },
+    }),
+    prisma.monthlyPoints.count({ where: { month, year, user: { role: 'STUDENT' } } }),
+  ])
 
   const ranked = rows.map((r, i) => ({
     rank: i + 1,
@@ -28,20 +33,27 @@ export async function GET(req: NextRequest) {
     isMe: r.userId === session.userId,
   }))
 
-  // Also return current user's position even if outside top 20
-  const myEntry = await prisma.monthlyPoints.findUnique({
-    where: { userId_month_year: { userId: session.userId, month, year } },
-  })
-  const allSorted = await prisma.monthlyPoints.count({
-    where: { month, year, user: { role: 'STUDENT' }, points: { gte: myEntry?.points ?? 0 } },
-  })
+  // Compute user's rank — check top 20 first to avoid extra DB query
+  const myTopEntry = ranked.find(r => r.userId === session.userId)
+  let myRank: number | null = null
+  if (myEntry) {
+    if (myTopEntry) {
+      myRank = myTopEntry.rank
+    } else {
+      // Outside top 20 — count people with strictly more points
+      const above = await prisma.monthlyPoints.count({
+        where: { month, year, user: { role: 'STUDENT' }, points: { gt: myEntry.points } },
+      })
+      myRank = above + 1
+    }
+  }
 
   return NextResponse.json({
     month,
     year,
     leaderboard: ranked,
-    myRank: myEntry ? allSorted : null,
+    myRank,
     myPoints: myEntry?.points ?? 0,
-    totalParticipants: await prisma.monthlyPoints.count({ where: { month, year, user: { role: 'STUDENT' } } }),
+    totalParticipants,
   })
 }

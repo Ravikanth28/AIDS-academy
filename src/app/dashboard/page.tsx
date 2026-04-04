@@ -12,6 +12,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   RadialBarChart, RadialBar, PolarAngleAxis, Cell,
 } from 'recharts'
+import { getCourseThumbnailUrl } from '@/lib/utils'
 
 interface ModuleProgress {
   moduleId: string
@@ -76,12 +77,11 @@ export default function DashboardPage() {
   useEffect(() => {
     Promise.all([
       fetch('/api/auth/me').then(r => r.json()),
-      fetch('/api/student/enrollments').then(r => r.json()),
-      fetch('/api/student/certificates').then(r => r.json()),
-    ]).then(([me, enr, certs]) => {
+      fetch('/api/student/dashboard').then(r => r.json()),
+    ]).then(([me, dash]) => {
       setUser(me)
-      setEnrollments(Array.isArray(enr) ? enr : [])
-      setCertificates(Array.isArray(certs) ? certs : [])
+      setEnrollments(Array.isArray(dash.enrollments) ? dash.enrollments : [])
+      setCertificates(Array.isArray(dash.certificates) ? dash.certificates : [])
       setLoading(false)
     })
   }, [])
@@ -541,8 +541,8 @@ export default function DashboardPage() {
 
                   {/* Thumbnail */}
                   <div className="relative h-32 overflow-hidden">
-                    {enr.course.thumbnail ? (
-                      <img src={enr.course.thumbnail} alt={enr.course.title} className="w-full h-full object-cover" />
+                    {getCourseThumbnailUrl(enr.course.thumbnail) ? (
+                      <img src={getCourseThumbnailUrl(enr.course.thumbnail)!} alt={enr.course.title} className="w-full h-full object-cover" />
                     ) : (
                       <div className={`w-full h-full bg-gradient-to-br ${cat.gradient} opacity-20`} />
                     )}

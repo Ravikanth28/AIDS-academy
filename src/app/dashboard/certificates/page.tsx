@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Loader2, Trophy, Calendar, Hash, Eye, Download, CheckCircle, Clock, XCircle } from 'lucide-react'
+import { Loader2, Trophy, Calendar, Hash, Eye, Download, CheckCircle, Clock, XCircle, Linkedin } from 'lucide-react'
 import CertificateCard from '@/components/student/CertificateCard'
+import { getCourseThumbnailUrl } from '@/lib/utils'
 
 interface Certificate {
   id: string
@@ -41,6 +42,20 @@ const DYNAMIC_POOL = [
 
 function strHash(s: string) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) & 0xffff; return h }
 function getCat(cat: string) { return CATEGORY_PRESETS[cat] ?? DYNAMIC_POOL[strHash(cat) % DYNAMIC_POOL.length] }
+
+function getLinkedInShareUrl(cert: Certificate) {
+  const issueDate = new Date(cert.issuedAt)
+  const params = new URLSearchParams({
+    startTask: 'CERTIFICATION_NAME',
+    name: cert.course.title,
+    organizationName: 'AI·DS Academy',
+    issueYear: String(issueDate.getFullYear()),
+    issueMonth: String(issueDate.getMonth() + 1),
+    certId: cert.certificateNo,
+    certUrl: `${typeof window !== 'undefined' ? window.location.origin : ''}/verify/${cert.certificateNo}`,
+  })
+  return `https://www.linkedin.com/profile/add?${params.toString()}`
+}
 
 export default function CertificatesPage() {
   const [certs, setCerts] = useState<Certificate[]>([])
@@ -127,8 +142,8 @@ export default function CertificatesPage() {
 
                   {/* Thumbnail / banner */}
                   <div className="relative h-36 overflow-hidden">
-                    {cert.course.thumbnail ? (
-                      <img src={cert.course.thumbnail} alt={cert.course.title} className="w-full h-full object-cover" />
+                    {getCourseThumbnailUrl(cert.course.thumbnail) ? (
+                      <img src={getCourseThumbnailUrl(cert.course.thumbnail)!} alt={cert.course.title} className="w-full h-full object-cover" />
                     ) : (
                       <div className={`w-full h-full bg-gradient-to-br ${cat.gradient} opacity-20`} />
                     )}
@@ -186,38 +201,53 @@ export default function CertificatesPage() {
                     )}
 
                     {/* Action buttons */}
-                    <div className="pt-3 border-t border-white/5 grid grid-cols-2 gap-2">
-                      <button
-                        onClick={() => canAct && setSelected(isOpen ? null : cert.id)}
-                        disabled={!canAct}
-                        title={!canAct ? 'Available after admin verification' : undefined}
-                        className={`flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-all
-                          ${canAct
-                            ? `bg-gradient-to-r ${cat.gradient} text-white hover:opacity-90`
-                            : 'bg-white/5 text-white/20 cursor-not-allowed'
-                          }`}
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        {isOpen ? 'Hide' : 'View'}
-                      </button>
+                    <div className="pt-3 border-t border-white/5 flex flex-col gap-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => canAct && setSelected(isOpen ? null : cert.id)}
+                          disabled={!canAct}
+                          title={!canAct ? 'Available after admin verification' : undefined}
+                          className={`flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-all
+                            ${canAct
+                              ? `bg-gradient-to-r ${cat.gradient} text-white hover:opacity-90`
+                              : 'bg-white/5 text-white/20 cursor-not-allowed'
+                            }`}
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          {isOpen ? 'Hide' : 'View'}
+                        </button>
 
-                      <button
-                        onClick={() => {
-                          if (!canAct) return
-                          setSelected(cert.id)
-                          setPendingDownload(cert.id)
-                        }}
-                        disabled={!canAct}
-                        title={!canAct ? 'Available after admin verification' : undefined}
-                        className={`flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-all
-                          ${canAct
-                            ? 'bg-white/8 border border-white/15 text-white/80 hover:bg-white/15 hover:text-white'
-                            : 'bg-white/5 text-white/20 cursor-not-allowed'
-                          }`}
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        Download
-                      </button>
+                        <button
+                          onClick={() => {
+                            if (!canAct) return
+                            setSelected(cert.id)
+                            setPendingDownload(cert.id)
+                          }}
+                          disabled={!canAct}
+                          title={!canAct ? 'Available after admin verification' : undefined}
+                          className={`flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-all
+                            ${canAct
+                              ? 'bg-white/8 border border-white/15 text-white/80 hover:bg-white/15 hover:text-white'
+                              : 'bg-white/5 text-white/20 cursor-not-allowed'
+                            }`}
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          Download
+                        </button>
+                      </div>
+
+                      {/* LinkedIn share — only for verified certs */}
+                      {canAct && (
+                        <a
+                          href={getLinkedInShareUrl(cert)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-semibold bg-[#0A66C2] hover:bg-[#004182] text-white transition-all shadow-md shadow-[#0A66C2]/25 hover:shadow-[#0A66C2]/40"
+                        >
+                          <Linkedin className="w-3.5 h-3.5" />
+                          Add to LinkedIn Profile
+                        </a>
+                      )}
                     </div>
 
                     {!canAct && cert.status === 'PENDING' && (

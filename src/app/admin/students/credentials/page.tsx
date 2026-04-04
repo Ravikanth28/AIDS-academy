@@ -9,7 +9,7 @@ import {
   Phone, Mail, Calendar, BookOpen, Award, CheckCircle, XCircle, Clock,
   ExternalLink, Save, Shield, TrendingUp, FileText, Users, Filter,
   ArrowUpDown, ChevronUp as SortUp, ChevronDown as SortDown, X,
-  GraduationCap, RefreshCw,
+  GraduationCap, RefreshCw, Trash2, AlertTriangle,
 } from 'lucide-react'
 
 /* ─────────────────────────  Types  ───────────────────────── */
@@ -101,10 +101,15 @@ export default function CredentialsPage() {
   const [showPw, setShowPw] = useState<Record<string, boolean>>({})
   const [savingPw, setSavingPw] = useState<string | null>(null)
 
+  // Delete state
+  const [deleteTarget, setDeleteTarget] = useState<StudentRow | null>(null)   // individual
+  const [deleteAllConfirm, setDeleteAllConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
   useEffect(() => {
-    fetch('/api/admin/students')
+    fetch('/api/admin/students?limit=1000')
       .then(r => r.json())
-      .then(data => { setStudents(Array.isArray(data) ? data : []); setLoading(false) })
+      .then(data => { setStudents(Array.isArray(data) ? data : (data.students ?? [])); setLoading(false) })
   }, [])
 
   async function toggleExpand(id: string) {
@@ -146,6 +151,37 @@ export default function CredentialsPage() {
   function clearFilters() {
     setEnrollFilter('all'); setCertFilter('all')
     setSortKey('joined'); setSortDir('desc'); setSearch('')
+  }
+
+  async function deleteStudent(student: StudentRow) {
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/admin/students/${student.id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error()
+      toast.success(`${student.name} deleted`)
+      setStudents(prev => prev.filter(s => s.id !== student.id))
+      setDeleteTarget(null)
+      if (expanded === student.id) setExpanded(null)
+    } catch {
+      toast.error('Failed to delete student')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  async function deleteAllStudents() {
+    setDeleting(true)
+    try {
+      await Promise.all(students.map(s => fetch(`/api/admin/students/${s.id}`, { method: 'DELETE' })))
+      toast.success(`All ${students.length} students deleted`)
+      setStudents([])
+      setDeleteAllConfirm(false)
+      setExpanded(null)
+    } catch {
+      toast.error('Some deletions failed')
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const activeFilterCount = (enrollFilter !== 'all' ? 1 : 0) + (certFilter !== 'all' ? 1 : 0)
@@ -258,6 +294,16 @@ export default function CredentialsPage() {
             <span className="w-5 h-5 rounded-full bg-purple-500 text-white text-[10px] font-bold flex items-center justify-center">{activeFilterCount}</span>
           )}
         </button>
+
+        {/* Delete All */}
+        {students.length > 0 && (
+          <button
+            onClick={() => setDeleteAllConfirm(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 text-sm font-medium hover:bg-red-500/20 transition-all flex-shrink-0"
+          >
+            <Trash2 className="w-4 h-4" /> Delete All
+          </button>
+        )}
       </div>
 
       {/* ── Filter Panel ── */}
@@ -341,6 +387,24 @@ export default function CredentialsPage() {
         )}
       </AnimatePresence>
 
+      {/* ── Dynamic filter count boxes ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {[
+          { label: 'Showing', value: filtered.length, sub: `of ${students.length} students`, color: 'border-purple-500/20 bg-purple-500/5 text-purple-300' },
+          { label: 'Enrolled', value: filtered.filter(s => s.enrollments.length > 0).length, sub: 'in view', color: 'border-blue-500/20 bg-blue-500/5 text-blue-300' },
+          { label: 'Verified Certs', value: filtered.reduce((a, s) => a + s.certificates.filter(c => c.status === 'VERIFIED').length, 0), sub: 'in view', color: 'border-green-500/20 bg-green-500/5 text-green-300' },
+          { label: 'Pending Certs', value: filtered.reduce((a, s) => a + s.certificates.filter(c => c.status === 'PENDING').length, 0), sub: 'in view', color: 'border-amber-500/20 bg-amber-500/5 text-amber-300' },
+        ].map(box => (
+          <div key={box.label} className={`rounded-xl border px-3 py-2.5 flex items-center gap-2.5 ${box.color}`}>
+            <div className="font-display text-xl font-bold">{box.value}</div>
+            <div>
+              <div className="text-xs font-medium">{box.label}</div>
+              <div className="text-[10px] opacity-50">{box.sub}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
       {/* ── Result count bar ── */}
       <div className="flex items-center justify-between text-xs text-white/30 px-1">
         <span>
@@ -358,7 +422,7 @@ export default function CredentialsPage() {
       </div>
 
       {/* ── Column header (desktop only, decorative) ── */}
-      <div className="hidden lg:grid grid-cols-[auto_1fr_160px_90px_90px_36px] gap-3 px-4 text-[10px] font-semibold text-white/20 uppercase tracking-wider border-b border-white/5 pb-2">
+      <div className="hidden lg:grid grid-cols-[auto_1fr_160px_90px_90px_36px_36px] gap-3 px-4 text-[10px] font-semibold text-white/20 uppercase tracking-wider border-b border-white/5 pb-2">
         <div className="w-10" />
         <div>Student</div>
         <div>Phone / Email</div>
@@ -368,6 +432,7 @@ export default function CredentialsPage() {
         <div className="text-center cursor-pointer hover:text-white/40 transition-colors" onClick={() => toggleSort('certs')}>
           <span className="flex items-center justify-center gap-1">Certs {sortKey === 'certs' ? (sortDir === 'asc' ? <SortUp className="w-2.5 h-2.5" /> : <SortDown className="w-2.5 h-2.5" />) : <ArrowUpDown className="w-2.5 h-2.5" />}</span>
         </div>
+        <div />
         <div />
       </div>
 
@@ -402,10 +467,11 @@ export default function CredentialsPage() {
                 }`}
               >
                 {/* ── Row ── */}
-                <button
-                  onClick={() => toggleExpand(student.id)}
-                  className="w-full text-left py-3.5 px-4 transition-colors"
-                >
+                <div className="flex items-stretch">
+                  <button
+                    onClick={() => toggleExpand(student.id)}
+                    className="flex-1 text-left py-3.5 px-4 transition-colors"
+                  >
                   {/* Mobile layout */}
                   <div className="flex items-center gap-3 lg:hidden">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 font-bold text-sm bg-gradient-to-br ${isOpen ? 'from-purple-500 to-violet-600' : 'from-purple-700/60 to-cyan-700/60'}`}>
@@ -474,7 +540,17 @@ export default function CredentialsPage() {
                       {isOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                     </div>
                   </div>
-                </button>
+                  </button>
+
+                  {/* Individual delete button */}
+                  <button
+                    onClick={e => { e.stopPropagation(); setDeleteTarget(student) }}
+                    className="flex items-center justify-center w-10 flex-shrink-0 border-l border-white/5 text-white/15 hover:text-red-400 hover:bg-red-500/8 transition-all"
+                    title="Delete student"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
 
                 {/* ── Expanded Detail Panel ── */}
                 <AnimatePresence>
@@ -735,6 +811,75 @@ export default function CredentialsPage() {
           })}
         </div>
       )}
+
+      {/* ── Delete Individual Confirm Modal ── */}
+      <AnimatePresence>
+        {deleteTarget && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"
+            onClick={() => setDeleteTarget(null)}
+          >
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              className="glass-card gradient-border p-6 w-full max-w-sm"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="w-12 h-12 rounded-full bg-red-500/15 border border-red-500/25 flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle className="w-6 h-6 text-red-400" />
+              </div>
+              <h3 className="font-display font-bold text-lg text-center mb-1">Delete Student?</h3>
+              <p className="text-white/40 text-sm text-center mb-1">
+                <span className="text-white/70 font-medium">{deleteTarget.name}</span>
+              </p>
+              <p className="text-white/30 text-xs text-center mb-6">
+                This will permanently delete their account, enrollments, progress, test attempts, and certificates.
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setDeleteTarget(null)} className="flex-1 btn-secondary py-2.5 text-sm">Cancel</button>
+                <button
+                  onClick={() => deleteStudent(deleteTarget)}
+                  disabled={deleting}
+                  className="flex-1 py-2.5 rounded-xl bg-red-500/20 text-red-300 border border-red-500/30 text-sm font-semibold hover:bg-red-500/30 transition-all disabled:opacity-50"
+                >
+                  {deleting ? 'Deleting…' : 'Delete'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Delete All Confirm Modal ── */}
+      <AnimatePresence>
+        {deleteAllConfirm && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"
+            onClick={() => setDeleteAllConfirm(false)}
+          >
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              className="glass-card gradient-border p-6 w-full max-w-sm"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="w-12 h-12 rounded-full bg-red-500/15 border border-red-500/25 flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle className="w-6 h-6 text-red-400" />
+              </div>
+              <h3 className="font-display font-bold text-lg text-center mb-1">Delete ALL Students?</h3>
+              <p className="text-white/30 text-sm text-center mb-6">
+                This will permanently delete all <span className="text-red-400 font-bold">{students.length} students</span> and all their data — enrollments, progress, tests, and certificates. This cannot be undone.
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setDeleteAllConfirm(false)} className="flex-1 btn-secondary py-2.5 text-sm">Cancel</button>
+                <button
+                  onClick={deleteAllStudents}
+                  disabled={deleting}
+                  className="flex-1 py-2.5 rounded-xl bg-red-500/20 text-red-300 border border-red-500/30 text-sm font-semibold hover:bg-red-500/30 transition-all disabled:opacity-50"
+                >
+                  {deleting ? 'Deleting…' : `Delete All ${students.length}`}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

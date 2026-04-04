@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, useEffect } from 'react'
-import { Download, Loader2, CheckCircle2, XCircle, Clock, ExternalLink } from 'lucide-react'
+import { Download, Loader2, CheckCircle2, XCircle, Clock, ExternalLink, Linkedin } from 'lucide-react'
 import { getPublicAppUrl } from '@/lib/app-url'
 
 interface CertificateCardProps {
@@ -37,6 +37,23 @@ export default function CertificateCard({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoDownload])
   const verifyUrl = `${getPublicAppUrl()}/verify/${certificateNo}`
+
+  // LinkedIn certificate share URL
+  // Uses LinkedIn's "Add to Profile" deeplink — opens a pre-filled certification form
+  function getLinkedInShareUrl() {
+    const issueYear = issueDate.getFullYear()
+    const issueMonth = issueDate.getMonth() + 1
+    const params = new URLSearchParams({
+      startTask: 'CERTIFICATION_NAME',
+      name: courseName,
+      organizationName: 'AI·DS Academy',
+      issueYear: String(issueYear),
+      issueMonth: String(issueMonth),
+      certId: certificateNo,
+      certUrl: verifyUrl,
+    })
+    return `https://www.linkedin.com/profile/add?${params.toString()}`
+  }
 
   const issueDate = new Date(issuedAt)
   const monthYear = issueDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
@@ -364,19 +381,31 @@ export default function CertificateCard({
         </div>
       )}
 
-      {/* Download button — only when verified */}
+      {/* Download + LinkedIn buttons — only when verified */}
       {status === 'VERIFIED' ? (
-        <button
-          onClick={downloadPDF}
-          disabled={downloading}
-          className="w-full btn-primary flex items-center justify-center gap-2"
-        >
-          {downloading ? (
-            <><Loader2 className="w-4 h-4 animate-spin" /> Generating PDF...</>
-          ) : (
-            <><Download className="w-4 h-4" /> Download Certificate (PDF)</>
-          )}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={downloadPDF}
+            disabled={downloading}
+            className="flex-1 btn-primary flex items-center justify-center gap-2"
+          >
+            {downloading ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Generating PDF...</>
+            ) : (
+              <><Download className="w-4 h-4" /> Download PDF</>
+            )}
+          </button>
+          <a
+            href={getLinkedInShareUrl()}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Add to LinkedIn Profile"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm bg-[#0A66C2] hover:bg-[#004182] text-white transition-all shadow-lg shadow-[#0A66C2]/30 hover:shadow-[#0A66C2]/50"
+          >
+            <Linkedin className="w-4 h-4" />
+            <span className="hidden sm:inline">Add to LinkedIn</span>
+          </a>
+        </div>
       ) : (
         <div className="w-full py-3 rounded-xl bg-white/5 border border-white/10 text-center text-white/30 text-sm">
           Download available after admin verification

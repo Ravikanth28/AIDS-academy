@@ -3,11 +3,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users, Award, BookOpen, Search, Loader2, Plus, X, Save,
   User, Phone, Mail, Key, Filter, ArrowUpDown, ChevronUp,
-  ChevronDown, ExternalLink, GraduationCap, TrendingUp, Calendar,
+  ChevronDown, ExternalLink, GraduationCap, Calendar,
 } from 'lucide-react'
+import { Pagination } from '@/components/Pagination'
+
+const STUDENTS_PER_PAGE = 15
 
 interface Student {
   id: string
@@ -48,6 +52,7 @@ export default function AdminStudentsPage() {
   const [statusFilter, setStatusFilter] = useState<StudentStatusFilter>('all')
   const [sortKey, setSortKey] = useState<SortKey>('joined')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
+  const [page, setPage] = useState(1)
 
   const [regName, setRegName] = useState('')
   const [regPhone, setRegPhone] = useState('')
@@ -56,9 +61,9 @@ export default function AdminStudentsPage() {
   const [regRole, setRegRole] = useState<'STUDENT' | 'ADMIN'>('STUDENT')
 
   function fetchStudents() {
-    fetch('/api/admin/students')
+    fetch('/api/admin/students?limit=100')
       .then((r) => r.json())
-      .then((data) => { setStudents(data); setLoading(false) })
+      .then((data) => { setStudents(Array.isArray(data) ? data : (data.students ?? [])); setLoading(false) })
   }
 
   function fetchCourses() {
@@ -145,6 +150,11 @@ export default function AdminStudentsPage() {
       return sortDir === 'asc' ? av - bv : bv - av
     }), [students, search, certFilter, enrollFilter, courseFilter, statusFilter, sortKey, sortDir])
 
+  // Reset to page 1 whenever filters/sort change
+  useEffect(() => { setPage(1) }, [search, certFilter, enrollFilter, courseFilter, statusFilter, sortKey, sortDir])
+
+  const paginated = filtered.slice((page - 1) * STUDENTS_PER_PAGE, page * STUDENTS_PER_PAGE)
+
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault()
     if (!regName.trim()) return toast.error('Name is required')
@@ -216,48 +226,52 @@ export default function AdminStudentsPage() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         {[
-          { label: 'Total Users', value: students.length, icon: Users, color: 'purple' },
-          { label: 'Enrolled', value: totalEnrolled, icon: BookOpen, color: 'cyan' },
-          { label: 'Certificates', value: totalCerts, icon: Award, color: 'amber' },
-          { label: 'Not Started', value: students.length - totalEnrolled, icon: GraduationCap, color: 'pink' },
+          {
+            label: 'Showing', sub: `of ${students.length} students`,
+            value: filtered.length,
+            gradient: 'from-purple-600 to-violet-600', text: 'text-purple-300', border: 'border-purple-500/20',
+            icon: Users, active: false, onClick: undefined,
+          },
+          {
+            label: 'Enrolled', sub: 'in view',
+            value: filtered.filter(s => courseFilter === 'all' ? s.enrollments.length > 0 : hasCourseEnrollment(s, courseFilter)).length,
+            gradient: 'from-cyan-600 to-blue-500', text: 'text-cyan-300', border: 'border-cyan-500/20',
+            icon: BookOpen, active: enrollFilter === 'enrolled',
+            onClick: () => setEnrollFilter(f => f === 'enrolled' ? 'all' : 'enrolled'),
+          },
+          {
+            label: 'Has Certificate', sub: 'in view',
+            value: filtered.filter(s => s.certificates.length > 0).length,
+            gradient: 'from-amber-500 to-orange-500', text: 'text-amber-300', border: 'border-amber-500/20',
+            icon: Award, active: certFilter === 'with-cert',
+            onClick: () => setCertFilter(f => f === 'with-cert' ? 'all' : 'with-cert'),
+          },
+          {
+            label: 'Not Started', sub: 'in view',
+            value: filtered.filter(s => s.enrollments.length === 0).length,
+            gradient: 'from-pink-600 to-rose-500', text: 'text-pink-300', border: 'border-pink-500/20',
+            icon: GraduationCap, active: enrollFilter === 'not-enrolled',
+            onClick: () => setEnrollFilter(f => f === 'not-enrolled' ? 'all' : 'not-enrolled'),
+          },
         ].map(stat => (
-          <div key={stat.label} className="glass-card p-4 flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-              stat.color === 'purple' ? 'bg-purple-500/20 text-purple-400' :
-              stat.color === 'cyan' ? 'bg-cyan-500/20 text-cyan-400' :
-              stat.color === 'amber' ? 'bg-amber-500/20 text-amber-400' :
-              'bg-pink-500/20 text-pink-400'
-            }`}>
-              <stat.icon className="w-5 h-5" />
+          <div
+            key={stat.label}
+            onClick={stat.onClick}
+            className={`rounded-2xl border p-4 flex items-center gap-3 transition-all duration-200 ${
+              stat.onClick ? 'cursor-pointer hover:border-white/20' : ''
+            } ${
+              stat.active
+                ? `bg-white/[0.06] ${stat.border} shadow-lg`
+                : `bg-gradient-to-br from-white/[0.04] to-white/[0.01] ${stat.border}`
+            }`}
+          >
+            <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${stat.gradient} flex items-center justify-center flex-shrink-0 opacity-80`}>
+              <stat.icon className="w-4 h-4 text-white" />
             </div>
             <div>
-              <div className="text-xl font-bold">{stat.value}</div>
-              <div className="text-xs text-white/40">{stat.label}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        {[
-          { label: 'Scope', value: filteredAnalytics.total, sub: selectedCourseLabel, icon: Users, color: 'purple' },
-          { label: 'Enrolled', value: filteredAnalytics.enrolledCount, sub: `${filteredAnalytics.notEnrolledCount} not enrolled`, icon: BookOpen, color: 'cyan' },
-          { label: 'Completed', value: filteredAnalytics.completedCount, sub: 'Certificate earned', icon: Award, color: 'amber' },
-          { label: 'In Progress', value: filteredAnalytics.inProgressCount, sub: 'Started, not completed', icon: TrendingUp, color: 'pink' },
-        ].map(stat => (
-          <div key={stat.label} className="glass-card p-4 flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-              stat.color === 'purple' ? 'bg-purple-500/20 text-purple-400' :
-              stat.color === 'cyan' ? 'bg-cyan-500/20 text-cyan-400' :
-              stat.color === 'amber' ? 'bg-amber-500/20 text-amber-400' :
-              'bg-pink-500/20 text-pink-400'
-            }`}>
-              <stat.icon className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-xl font-bold">{stat.value}</div>
-              <div className="text-xs text-white/40">{stat.label}</div>
-              <div className="text-[11px] text-white/25 mt-0.5">{stat.sub}</div>
+              <div className={`font-display text-2xl font-bold ${stat.text}`}>{stat.value}</div>
+              <div className="text-xs text-white/50 font-medium leading-tight">{stat.label}</div>
+              <div className="text-[10px] text-white/25 leading-tight">{stat.sub}</div>
             </div>
           </div>
         ))}
@@ -289,6 +303,7 @@ export default function AdminStudentsPage() {
                 {activeFilterCount}
               </span>
             )}
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showFilters ? 'rotate-180' : ''}`} />
           </button>
           {activeFilterCount > 0 && (
             <button
@@ -300,70 +315,86 @@ export default function AdminStudentsPage() {
           )}
         </div>
 
-        {showFilters && (
-          <div className="mt-4 pt-4 border-t border-white/5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-            <div>
-              <p className="text-xs text-white/40 mb-2 uppercase tracking-wider">Course</p>
-              <select
-                value={courseFilter}
-                onChange={(e) => setCourseFilter(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white/70 focus:outline-none focus:border-purple-500/40"
-              >
-                <option value="all">All Courses</option>
-                {courses.map(course => (
-                  <option key={course.id} value={course.id}>{course.title}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <p className="text-xs text-white/40 mb-2 uppercase tracking-wider">Certificate</p>
-              <div className="flex gap-2">
-                {(['all', 'with-cert', 'no-cert'] as CertFilter[]).map(f => (
-                  <button key={f} onClick={() => setCertFilter(f)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      certFilter === f ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-white/5 text-white/40 hover:bg-white/10'
-                    }`}
-                  >
-                    {f === 'all' ? 'All' : f === 'with-cert' ? '🏆 Has Certificate' : 'No Certificate'}
-                  </button>
-                ))}
+        <AnimatePresence>
+          {showFilters && (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.15 }}
+            >
+              <div className="mt-4 pt-4 border-t border-white/8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                  <div>
+                    <label className="text-[10px] text-white/35 uppercase tracking-wider font-medium mb-1.5 block">Course</label>
+                    <select
+                      value={courseFilter}
+                      onChange={(e) => setCourseFilter(e.target.value)}
+                      className="w-full bg-white/5 border border-white/[0.08] rounded-lg px-3 py-2.5 text-sm text-white/70 focus:outline-none focus:border-purple-500/40 transition-all"
+                      style={{ colorScheme: 'dark' }}
+                    >
+                      <option value="all">All Courses</option>
+                      {courses.map(course => (
+                        <option key={course.id} value={course.id}>{course.title}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-white/35 uppercase tracking-wider font-medium mb-1.5 block">Certificate</label>
+                    <select
+                      value={certFilter}
+                      onChange={(e) => setCertFilter(e.target.value as CertFilter)}
+                      className="w-full bg-white/5 border border-white/[0.08] rounded-lg px-3 py-2.5 text-sm text-white/70 focus:outline-none focus:border-purple-500/40 transition-all"
+                      style={{ colorScheme: 'dark' }}
+                    >
+                      <option value="all">All</option>
+                      <option value="with-cert">Has Certificate</option>
+                      <option value="no-cert">No Certificate</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-white/35 uppercase tracking-wider font-medium mb-1.5 block">Enrollment</label>
+                    <select
+                      value={enrollFilter}
+                      onChange={(e) => setEnrollFilter(e.target.value as EnrollFilter)}
+                      className="w-full bg-white/5 border border-white/[0.08] rounded-lg px-3 py-2.5 text-sm text-white/70 focus:outline-none focus:border-purple-500/40 transition-all"
+                      style={{ colorScheme: 'dark' }}
+                    >
+                      <option value="all">All</option>
+                      <option value="enrolled">Enrolled</option>
+                      <option value="not-enrolled">Not Enrolled</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-white/35 uppercase tracking-wider font-medium mb-1.5 block">Status</label>
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value as StudentStatusFilter)}
+                      className="w-full bg-white/5 border border-white/[0.08] rounded-lg px-3 py-2.5 text-sm text-white/70 focus:outline-none focus:border-purple-500/40 transition-all"
+                      style={{ colorScheme: 'dark' }}
+                    >
+                      <option value="all">All Statuses</option>
+                      <option value="completed">Completed</option>
+                      <option value="in-progress">In Progress</option>
+                      <option value="not-started">Not Started</option>
+                    </select>
+                  </div>
+                </div>
+                {activeFilterCount > 0 && (
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
+                    <span className="text-xs text-white/30">{filtered.length} of {students.length} students shown</span>
+                    <button
+                      onClick={() => { setCertFilter('all'); setEnrollFilter('all'); setCourseFilter('all'); setStatusFilter('all'); setSearch('') }}
+                      className="text-xs text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1"
+                    >
+                      <X className="w-3 h-3" /> Clear all filters
+                    </button>
+                  </div>
+                )}
               </div>
-            </div>
-            <div>
-              <p className="text-xs text-white/40 mb-2 uppercase tracking-wider">Enrollment</p>
-              <div className="flex gap-2">
-                {(['all', 'enrolled', 'not-enrolled'] as EnrollFilter[]).map(f => (
-                  <button key={f} onClick={() => setEnrollFilter(f)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      enrollFilter === f ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' : 'bg-white/5 text-white/40 hover:bg-white/10'
-                    }`}
-                  >
-                    {f === 'all' ? 'All' : f === 'enrolled' ? '📚 Enrolled' : 'Not Started'}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="text-xs text-white/40 mb-2 uppercase tracking-wider">Status</p>
-              <div className="flex gap-2 flex-wrap">
-                {([
-                  ['all', 'All'],
-                  ['completed', 'Completed'],
-                  ['in-progress', 'In Progress'],
-                  ['not-started', 'Not Started'],
-                ] as Array<[StudentStatusFilter, string]>).map(([value, label]) => (
-                  <button key={value} onClick={() => setStatusFilter(value)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      statusFilter === value ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'bg-white/5 text-white/40 hover:bg-white/10'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {loading ? (
@@ -411,7 +442,7 @@ export default function AdminStudentsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {filtered.map((student) => {
+                {paginated.map((student) => {
                   const relevantEnrollments = getRelevantEnrollments(student)
                   const totalModules = relevantEnrollments.reduce((a, e) => a + e.moduleProgress.length, 0)
                   const doneMods = relevantEnrollments.reduce((a, e) => a + e.moduleProgress.filter(p => p.testPassed).length, 0)
@@ -516,14 +547,13 @@ export default function AdminStudentsPage() {
               </tbody>
             </table>
           </div>
-          <div className="px-5 py-3 border-t border-white/5 flex items-center justify-between">
-            <p className="text-xs text-white/30">
-              Showing <span className="text-white/60 font-medium">{filtered.length}</span> of <span className="text-white/60 font-medium">{students.length}</span> users
-            </p>
-            <div className="flex items-center gap-1.5 text-xs text-white/30">
-              <TrendingUp className="w-3.5 h-3.5" />
-              Sort: <span className="text-white/50 capitalize">{sortKey} ({sortDir})</span>
-            </div>
+          <div className="px-5 pb-2">
+            <Pagination
+              page={page}
+              total={filtered.length}
+              perPage={STUDENTS_PER_PAGE}
+              onChange={setPage}
+            />
           </div>
         </div>
       )}

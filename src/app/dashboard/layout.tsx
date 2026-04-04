@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { Brain, LayoutDashboard, BookOpen, Award, LogOut, Menu, ChevronRight, UserCircle, Trophy } from 'lucide-react'
+import { ThemeToggle } from '@/components/ThemeToggle'
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -35,7 +36,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         if (data.role === 'ADMIN') { router.push('/admin'); return }
         setUser(data)
       })
-  }, [])
+  }, [router])
 
   async function handleLogout() {
     await fetch('/api/auth/logout', { method: 'POST' })
@@ -99,12 +100,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
             </div>
           )}
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 w-full px-4 py-2.5 rounded-xl text-sm text-white/50 hover:text-white/70 hover:bg-white/5 transition-all"
-          >
-            <LogOut className="w-4 h-4" /> Sign Out
-          </button>
+          <div className="flex items-center gap-2 mb-2">
+            <ThemeToggle />
+            <button
+              onClick={handleLogout}
+              className="flex-1 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm text-white/50 hover:text-white/70 hover:bg-white/5 transition-all"
+            >
+              <LogOut className="w-4 h-4" /> Sign Out
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -114,7 +118,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Menu className="w-5 h-5" />
           </button>
           <span className="font-display font-bold text-sm gradient-text">AI·DS Academy</span>
-          <div className="w-9" />
+          <ThemeToggle />
         </header>
         <main className="flex-1 p-3 sm:p-6">
           <div className="w-full max-w-7xl mx-auto">{children}</div>

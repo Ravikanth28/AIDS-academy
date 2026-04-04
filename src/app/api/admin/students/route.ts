@@ -1,36 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin } from '@/lib/middleware-helpers'
-import { createHash } from 'crypto'
+import bcrypt from 'bcryptjs'
 
-function hashPassword(password: string): string {
-  return createHash('sha256').update(password).digest('hex')
+async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, 10)
 }
 
-// GET all students
+// GET all students (paginated)
 export async function GET(req: NextRequest) {
   const { error } = await requireAdmin(req)
   if (error) return error
 
-  const students = await prisma.user.findMany({
-    where: { role: 'STUDENT' },
-    include: {
-      enrollments: {
-        include: {
-          course: { select: { id: true, title: true } },
-          moduleProgress: {
-            include: { module: { select: { id: true, title: true, order: true } } },
+  const { searchParams } = new URL(req.url)
+  const page = parseInt(searchParams.get('page') ?? '1')
+  const limit = parseInt(searchParams.get('limit') ?? '20')
+  const skip = (page - 1) * limit
+
+  const [students, total] = await Promise.all([
+    prisma.user.findMany({
+      where: { role: 'STUDENT' },
+      include: {
+        enrollments: {
+          include: {
+            course: { select: { id: true, title: true } },
+            moduleProgress: {
+              select: { testPassed: true },
+            },
           },
         },
+        certificates: {
+          include: { course: { select: { id: true, title: true } } },
+        },
       },
-      certificates: {
-        include: { course: { select: { id: true, title: true } } },
-      },
-    },
-    orderBy: { createdAt: 'desc' },
-  })
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit,
+    }),
+    prisma.user.count({ where: { role: 'STUDENT' } }),
+  ])
 
-  return NextResponse.json(students)
+  return NextResponse.json({ students, total, page, limit })
 }
 
 // POST register a new student (admin-created)
@@ -56,18 +66,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid email format' }, { status: 400 })
   }
 
-  const data: Record<string, unknown> = {
+  const data: {
+    name: string
+    phone: string
+    email: string | null
+    role: 'ADMIN' | 'STUDENT'
+    password?: string
+  } = {
     name: name.trim(),
     phone: phone.trim(),
-    email: email?.trim() || null,
+    email: email?.trim() ? email.trim().toLowerCase() : null,
     role: role === 'ADMIN' ? 'ADMIN' : 'STUDENT',
   }
 
   if (password?.trim()) {
-    data.password = hashPassword(password)
+    data.password = await hashPassword(password)
   }
 
-  const user = await prisma.user.create({ data: data as any })
+  const user = await prisma.user.create({ data })
 
   return NextResponse.json({
     id: user.id,

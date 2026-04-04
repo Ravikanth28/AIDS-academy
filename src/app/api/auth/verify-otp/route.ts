@@ -3,13 +3,24 @@ import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { signToken } from '@/lib/auth'
 import { logActivity, logLoginActivity, POINTS } from '@/lib/points'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown'
     const { phone, otp, action, name, email, password } = await req.json()
 
     if (!phone || !otp) {
       return NextResponse.json({ error: 'Phone and OTP are required' }, { status: 400 })
+    }
+
+    // Rate limit per phone — 5 attempts per 15 minutes
+    const rl = checkRateLimit(`verify-otp:${phone}:${ip}`, 5, 15 * 60 * 1000)
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: `Too many OTP attempts. Try again in ${rl.retryAfter} seconds.` },
+        { status: 429 },
+      )
     }
 
     const otpSession = await prisma.oTPSession.findFirst({
@@ -21,7 +32,13 @@ export async function POST(req: NextRequest) {
       orderBy: { createdAt: 'desc' },
     })
 
-    if (!otpSession || otpSession.otp !== otp) {
+    if (!otpSession) {
+      return NextResponse.json({ error: 'Invalid or expired OTP' }, { status: 401 })
+    }
+
+    // Constant-time comparison via bcrypt
+    const otpValid = await bcrypt.compare(otp, otpSession.otp)
+    if (!otpValid) {
       return NextResponse.json({ error: 'Invalid or expired OTP' }, { status: 401 })
     }
 
@@ -62,6 +79,7 @@ export async function POST(req: NextRequest) {
       phone: user.phone,
       role: user.role,
       name: user.name,
+      email: user.email ?? null,
     })
 
     // Log login activity (but not on register)

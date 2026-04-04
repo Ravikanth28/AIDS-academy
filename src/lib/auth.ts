@@ -2,15 +2,17 @@ import { SignJWT, jwtVerify } from 'jose'
 import { cookies } from 'next/headers'
 import { NextRequest } from 'next/server'
 
-const SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'fallback-secret-change-in-production'
-)
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is not set. Set it in your .env file before starting the server.')
+}
+const SECRET = new TextEncoder().encode(process.env.JWT_SECRET)
 
 export interface JWTPayload {
   userId: string
   phone: string
   role: 'ADMIN' | 'STUDENT'
   name: string
+  email?: string | null
 }
 
 export async function signToken(payload: JWTPayload): Promise<string> {

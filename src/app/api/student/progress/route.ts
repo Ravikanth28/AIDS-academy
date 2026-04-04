@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
   // Get total videos in module
   const totalVideos = await prisma.video.count({ where: { moduleId } })
 
-  let videosWatched = progress?.videosWatched ?? []
+  let videosWatched = (progress?.videosWatched ?? []) as string[]
   if (!videosWatched.includes(videoId)) {
     videosWatched = [...videosWatched, videoId]
   }
@@ -35,18 +35,19 @@ export async function POST(req: NextRequest) {
   if (progress) {
     progress = await prisma.moduleProgress.update({
       where: { enrollmentId_moduleId: { enrollmentId: enrollment.id, moduleId } },
-      data: { videosWatched, videoCompleted },
+      data: { videosWatched: JSON.stringify(videosWatched), videoCompleted },
     })
   } else {
     progress = await prisma.moduleProgress.create({
       data: {
         enrollmentId: enrollment.id,
         moduleId,
-        videosWatched,
+        videosWatched: JSON.stringify(videosWatched),
         videoCompleted,
       },
     })
   }
 
-  return NextResponse.json({ progress, videoCompleted })
+  // Return videosWatched as array for the frontend
+  return NextResponse.json({ progress: { ...progress, videosWatched }, videoCompleted })
 }

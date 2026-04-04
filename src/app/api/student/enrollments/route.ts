@@ -35,6 +35,10 @@ export async function POST(req: NextRequest) {
   const { courseId } = await req.json()
   if (!courseId) return NextResponse.json({ error: 'courseId required' }, { status: 400 })
 
+  const course = await prisma.course.findUnique({ where: { id: courseId }, select: { isAssignedOnly: true, isPublished: true } })
+  if (!course || !course.isPublished) return NextResponse.json({ error: 'Course not found' }, { status: 404 })
+  if (course.isAssignedOnly) return NextResponse.json({ error: 'This course is by admin assignment only' }, { status: 403 })
+
   const existing = await prisma.enrollment.findUnique({
     where: { userId_courseId: { userId: session!.userId, courseId } },
   })

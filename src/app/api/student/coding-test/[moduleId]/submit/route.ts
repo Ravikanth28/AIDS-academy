@@ -10,6 +10,8 @@ interface ProblemSubmission {
   difficulty: string
   description: string
   solution: string
+  language: string
+  examples: Array<{ input: string; output: string }>
 }
 
 // POST: Evaluate coding/SQL submissions with AI and save attempt
@@ -27,38 +29,53 @@ export async function POST(req: NextRequest, { params }: { params: { moduleId: s
   const module_ = await prisma.module.findUnique({ where: { id: params.moduleId } })
   if (!module_) return NextResponse.json({ error: 'Module not found' }, { status: 404 })
 
-  const systemPrompt = `You are a strict but fair code evaluator for a programming/data science course.
-Evaluate each submitted solution and return ONLY valid JSON matching this exact schema:
+  const systemPrompt = `You are a fair and generous code evaluator for a programming course. Your job is to reward correct logic.
+
+Evaluate each solution and return ONLY valid JSON:
 {
   "evaluations": [
     {
       "problemId": "string",
       "score": number (0-100),
       "passed": boolean (true if score >= 60),
-      "correctness": "brief assessment of logical correctness",
-      "efficiency": "brief assessment of time/space complexity or query efficiency",
-      "feedback": "specific, actionable feedback pointing out issues or praise",
-      "betterApproach": "optional: suggest a better approach if score < 80, else null"
+      "correctness": "one sentence on correctness",
+      "efficiency": "one sentence on efficiency",
+      "feedback": "helpful feedback",
+      "betterApproach": null or "suggestion only if score < 70"
     }
   ],
-  "totalScore": number (average of all scores, rounded),
-  "overallFeedback": "brief summary of performance across all problems"
+  "totalScore": number (average, rounded),
+  "overallFeedback": "brief overall summary"
 }
-Scoring guide:
-- 90-100: Completely correct, efficient, clean code
-- 70-89: Correct but minor inefficiencies or style issues
-- 50-69: Partially correct, core logic present but bugs or missing cases
-- 30-49: Attempt made but significant logical errors
-- 0-29: Incomplete or completely wrong`
 
-  const problemsList = submissions.map((s, i) =>
-    `Problem ${i + 1} [${s.difficulty.toUpperCase()}] (${s.type}) — ${s.title}:
+SCORING (apply strictly):
+- 90-100: Logic is correct and computes the right answer for all examples
+- 75-89: Logic is mostly correct, trivial style issues only
+- 50-74: Partially correct — has the right idea but output is wrong in some cases
+- 25-49: Wrong logic for most cases
+- 0-24: Blank, completely unrelated, or nonsensical code
+
+CRITICAL RULES — you MUST follow these:
+1. This platform runs code via stdin/stdout. input() in Python and scanf in C are the CORRECT way to read values. Do NOT penalise for using input().
+2. Do NOT require function definitions (def/class). Procedural scripts using input() are 100% valid and correct.
+3. Do NOT require error handling, input validation, or type checking unless the problem explicitly asks for it.
+4. The "examples" field shows LOGICAL input values and expected output. Use them to TRACE through the student's code mentally and verify the logic produces the right answer.
+5. If the code correctly reads inputs and computes the right result → score MUST be 90+.
+6. Never give 0 unless the code is completely blank or prints a hardcoded unrelated answer.`
+
+  const problemsList = submissions.map((s, i) => {
+    const examplesText = s.examples?.length
+      ? s.examples.map((ex, j) => `  Example ${j + 1}: Input: ${ex.input} → Expected Output: ${ex.output}`).join('\n')
+      : '  (no examples provided)'
+    return `Problem ${i + 1} [${s.difficulty.toUpperCase()}] (${s.type}) — ${s.title}
+Language: ${s.language}
 Description: ${s.description}
+Expected examples:
+${examplesText}
 ---
-Submitted Solution:
-${s.solution || '(no solution submitted)'}
-`
-  ).join('\n\n')
+Submitted Solution (${s.language}):
+${s.solution || '(no solution submitted)'}`
+  }).join('\n\n')
 
   const userPrompt = `Evaluate these ${submissions.length} submissions for module "${module_.title}":
 
