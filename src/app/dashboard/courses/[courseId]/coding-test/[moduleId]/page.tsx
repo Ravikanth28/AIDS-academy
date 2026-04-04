@@ -73,6 +73,8 @@ interface Problem {
   examples: Array<{ input: string; output: string }>
   constraints: string
   starterCode: string
+  sqlSchema?: string
+  expectedOutput?: string
 }
 
 interface TestContent {
@@ -144,6 +146,16 @@ export default function CodingTestPage() {
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<TestResult | null>(null)
   const [expandedFeedback, setExpandedFeedback] = useState<Set<string>>(new Set())
+
+  // SQL execution results
+  const [sqlResults, setSqlResults] = useState<Record<string, {
+    columns: string[]
+    rows: Record<string, unknown>[]
+    matched: boolean
+    error?: string
+    message?: string
+    running: boolean
+  }>>({})
 
   // Terminal auto-scroll refs (one per problem)
   const termRefs = useRef<Record<string, HTMLDivElement | null>>({})
@@ -366,9 +378,51 @@ export default function CodingTestPage() {
     return result
   }
 
+  // ─── SQL execution ────────────────────────────────────────────────────────────
+  async function handleSqlRun(problemId: string) {
+    const problem = content?.problems.find(p => p.id === problemId)
+    if (!problem) return
+    const query = solutions[problemId] || ''
+    if (!query.trim() || query.trim() === '-- Write your SQL query here\nSELECT ') {
+      toast.error('Write a SQL query first')
+      return
+    }
+    setSqlResults(prev => ({ ...prev, [problemId]: { columns: [], rows: [], matched: false, running: true } }))
+    setTerminalOpen(prev => ({ ...prev, [problemId]: true }))
+    try {
+      const res = await fetch('/api/student/run-sql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          schema: problem.sqlSchema || '',
+          query,
+          expectedOutput: problem.expectedOutput || '',
+        }),
+      })
+      const data = await res.json()
+      setSqlResults(prev => ({
+        ...prev,
+        [problemId]: {
+          columns: data.columns || [],
+          rows: data.rows || [],
+          matched: data.matched ?? false,
+          error: data.error,
+          message: data.message,
+          running: false,
+        },
+      }))
+    } catch {
+      setSqlResults(prev => ({
+        ...prev,
+        [problemId]: { columns: [], rows: [], matched: false, running: false, error: 'Connection error' },
+      }))
+    }
+  }
+
   // Always-fresh run: clears state, then starts incremental (Python) or batch (others) execution
   function handleFreshRun(problemId: string) {
     const lang = languages[problemId] || 'python'
+    if (lang === 'sql') { handleSqlRun(problemId); return }
     const code = solutions[problemId] || ''
     if (!code.trim()) { toast.error('Write some code first'); return }
     setRunResults(prev => { const n = { ...prev }; delete n[problemId]; return n })
@@ -524,6 +578,8 @@ export default function CodingTestPage() {
         solution: solutions[p.id] || '',
         language: languages[p.id] || getDefaultLang(p.type),
         examples: p.examples ?? [],
+        sqlSchema: p.sqlSchema || '',
+        expectedOutput: p.expectedOutput || '',
       }))
       const res = await fetch(`/api/student/coding-test/${moduleId}/submit`, {
         method: 'POST',
@@ -783,7 +839,54 @@ export default function CodingTestPage() {
                     {problem.description}
                   </div>
 
-                  {problem.examples?.length > 0 && (
+                  {/* SQL: Schema + Expected Output */}
+                  {problem.type === 'sql' && (
+                    <>
+                      {problem.sqlSchema && (
+                        <div>
+                          <p className="text-[10px] font-semibold text-emerald-400/80 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                            <Database className="w-3 h-3" /> Schema
+                          </p>
+                          <pre className="bg-[#071010] border border-emerald-500/15 rounded-lg p-3 text-[11px] font-mono text-emerald-200/70 overflow-x-auto whitespace-pre leading-relaxed">{problem.sqlSchema}</pre>
+                        </div>
+                      )}
+                      {problem.expectedOutput && (() => {
+                        try {
+                          const rows = JSON.parse(problem.expectedOutput) as Record<string, unknown>[]
+                          if (!Array.isArray(rows) || rows.length === 0) return null
+                          const cols = Object.keys(rows[0])
+                          return (
+                            <div>
+                              <p className="text-[10px] font-semibold text-cyan-400/80 uppercase tracking-wider mb-1.5">Expected Output</p>
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-xs border-collapse">
+                                  <thead>
+                                    <tr className="bg-cyan-500/10 border border-cyan-500/20">
+                                      {cols.map(c => (
+                                        <th key={c} className="px-3 py-1.5 text-left font-semibold text-cyan-300/80 border-r border-cyan-500/10 last:border-r-0">{c}</th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {rows.map((row, i) => (
+                                      <tr key={i} className="border-b border-white/5 hover:bg-white/2">
+                                        {cols.map(c => (
+                                          <td key={c} className="px-3 py-1.5 font-mono text-white/60 border-r border-white/5 last:border-r-0">{String(row[c] ?? 'NULL')}</td>
+                                        ))}
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          )
+                        } catch { return null }
+                      })()}
+                    </>
+                  )}
+
+                  {/* Coding: Examples */}
+                  {problem.type !== 'sql' && problem.examples?.length > 0 && (
                     <div className="space-y-2">
                       {problem.examples.map((ex, i) => (
                         <div key={i} className="bg-white/[0.03] border border-white/8 rounded-lg p-3">
@@ -889,11 +992,72 @@ export default function CodingTestPage() {
                     />
                   </div>
 
-                  {/* Terminal panel — always visible once opened */}
+                  {/* Terminal panel — coding type: always visible once opened; SQL type: SQL result panel */}
                   {terminalOpen[problem.id] && (
                     <div className="flex-shrink-0 border-t border-white/8 bg-[#0a0c10]" style={{ height: 220 }}>
-                      {/* Terminal tab bar */}
-                      <div className="flex items-center gap-0 border-b border-white/8 bg-[#0d1117] select-none">
+
+                      {/* ── SQL Result Panel ── */}
+                      {problem.type === 'sql' ? (() => {
+                        const sr = sqlResults[problem.id]
+                        return (
+                          <div className="h-full flex flex-col">
+                            {/* Header */}
+                            <div className="flex items-center gap-2 px-3 py-1.5 border-b border-white/8 bg-[#0d1117] text-[11px]">
+                              <Database className="w-3 h-3 text-emerald-400" />
+                              <span className="text-white/40 font-medium">SQL Result</span>
+                              {sr && !sr.running && !sr.error && (
+                                sr.matched
+                                  ? <span className="ml-auto flex items-center gap-1 text-green-400 font-semibold"><CheckCircle className="w-3.5 h-3.5" /> Output matches expected</span>
+                                  : <span className="ml-auto flex items-center gap-1 text-red-400 font-semibold"><XCircle className="w-3.5 h-3.5" /> Output does not match expected</span>
+                              )}
+                              <button
+                                onClick={() => setTerminalOpen(prev => ({ ...prev, [problem.id]: false }))}
+                                className="ml-auto text-white/20 hover:text-white/50 text-xs px-1"
+                              >✕</button>
+                            </div>
+                            {/* Body */}
+                            <div className="flex-1 overflow-auto p-2">
+                              {!sr || sr.running ? (
+                                <div className="flex items-center gap-2 text-cyan-400/60 p-2">
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  <span className="text-xs">Running query...</span>
+                                </div>
+                              ) : sr.error ? (
+                                <div className="flex items-start gap-2 text-red-400 p-2">
+                                  <XCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                                  <pre className="text-xs font-mono whitespace-pre-wrap">{sr.error}</pre>
+                                </div>
+                              ) : sr.message ? (
+                                <p className="text-xs text-white/30 italic p-2">{sr.message}</p>
+                              ) : sr.columns.length === 0 ? (
+                                <p className="text-xs text-white/30 italic p-2">No results returned</p>
+                              ) : (
+                                <table className="w-full text-[11px] border-collapse">
+                                  <thead>
+                                    <tr className="bg-white/5">
+                                      {sr.columns.map(c => (
+                                        <th key={c} className="px-2 py-1 text-left font-semibold text-emerald-300/70 border-b border-white/8 border-r border-white/5 last:border-r-0 whitespace-nowrap">{c}</th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {sr.rows.map((row, i) => (
+                                      <tr key={i} className="border-b border-white/5 hover:bg-white/2">
+                                        {sr.columns.map(c => (
+                                          <td key={c} className="px-2 py-1 font-mono text-white/60 border-r border-white/5 last:border-r-0 whitespace-nowrap">{String(row[c] ?? 'NULL')}</td>
+                                        ))}
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })() : (
+                        /* ── Coding Terminal Panel ── */
+                        <>
+                        <div className="flex items-center gap-0 border-b border-white/8 bg-[#0d1117] select-none">
                         <button
                           onClick={() => setTerminalTab(prev => ({ ...prev, [problem.id]: 'stdin' }))}
                           className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium border-r border-white/8 transition-colors ${
@@ -1063,6 +1227,8 @@ export default function CodingTestPage() {
                             <span className="text-white/20 italic">Press Run to execute your code</span>
                           )}
                         </div>
+                      )}
+                        </>
                       )}
                     </div>
                   )}

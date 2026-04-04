@@ -54,6 +54,8 @@ interface CodingQuestionForm {
   starterCode: string
   hints: string[]
   sampleSolution: string
+  sqlSchema: string
+  expectedOutput: string
 }
 
 interface SavedCodingQuestion {
@@ -101,6 +103,8 @@ const emptyCodingQ = (): CodingQuestionForm => ({
   starterCode: '',
   hints: [''],
   sampleSolution: '',
+  sqlSchema: '',
+  expectedOutput: '',
 })
 
 const emptyCheckpoint = (): CheckpointForm => ({
@@ -213,7 +217,12 @@ export default function ModuleQuestionsPanel({ moduleId, passingScore, questionC
         const res = await fetch(`/api/admin/modules/${moduleId}/coding-questions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(q),
+          body: JSON.stringify({
+            ...q,
+            sqlSchema: q.type === 'sql' ? q.sqlSchema : '',
+            expectedOutput: q.type === 'sql' ? q.expectedOutput : '',
+            examples: q.type === 'sql' ? [] : q.examples,
+          }),
         })
         if (!res.ok) throw new Error()
       }
@@ -808,7 +817,42 @@ export default function ModuleQuestionsPanel({ moduleId, passingScore, questionC
                     />
                   </div>
 
-                  {/* Examples */}
+                  {/* Examples (coding only) / SQL Schema + Expected Output (sql) */}
+                  {q.type === 'sql' ? (
+                    <>
+                      {/* SQL Schema */}
+                      <div>
+                        <label className="text-xs text-white/40 mb-1 block">
+                          SQL Schema <span className="text-emerald-400/60">(CREATE TABLE + INSERT INTO statements)</span>
+                        </label>
+                        <textarea
+                          className="input-field resize-none text-sm font-mono bg-[#0d1117] text-emerald-200/70"
+                          placeholder={"CREATE TABLE employees (\n  id INT,\n  name VARCHAR(50),\n  salary DECIMAL(10,2)\n);\nINSERT INTO employees VALUES (1, 'Alice', 70000.00);\nINSERT INTO employees VALUES (2, 'Bob', 80000.00);\nINSERT INTO employees VALUES (3, 'Charlie', 65000.00);"}
+                          value={q.sqlSchema}
+                          rows={7}
+                          spellCheck={false}
+                          onChange={e => updateCodingQ(qi, 'sqlSchema', e.target.value)}
+                        />
+                      </div>
+
+                      {/* Expected Output */}
+                      <div>
+                        <label className="text-xs text-white/40 mb-1 block">
+                          Expected Output <span className="text-cyan-400/60">(JSON array of result rows)</span>
+                        </label>
+                        <textarea
+                          className="input-field resize-none text-sm font-mono bg-[#0d1117] text-cyan-200/70"
+                          placeholder={'[\n  {"name": "Bob", "salary": 80000},\n  {"name": "Alice", "salary": 70000}\n]'}
+                          value={q.expectedOutput}
+                          rows={5}
+                          spellCheck={false}
+                          onChange={e => updateCodingQ(qi, 'expectedOutput', e.target.value)}
+                        />
+                        <p className="text-[10px] text-white/25 mt-1">Enter the exact result rows the student&apos;s query should return, as a JSON array.</p>
+                      </div>
+                    </>
+                  ) : (
+                  /* Examples — coding type only */
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <label className="text-xs text-white/40">Examples</label>
@@ -842,13 +886,14 @@ export default function ModuleQuestionsPanel({ moduleId, passingScore, questionC
                       ))}
                     </div>
                   </div>
+                  )}
 
                   {/* Constraints */}
                   <div>
                     <label className="text-xs text-white/40 mb-1 block">Constraints (optional)</label>
                     <input
                       className="input-field text-sm"
-                      placeholder="e.g., O(n) time complexity, 1 ≤ n ≤ 10^4"
+                      placeholder={q.type === 'sql' ? 'e.g., Use only SELECT, no subqueries' : 'e.g., O(n) time complexity, 1 ≤ n ≤ 10^4'}
                       value={q.constraints}
                       onChange={e => updateCodingQ(qi, 'constraints', e.target.value)}
                     />

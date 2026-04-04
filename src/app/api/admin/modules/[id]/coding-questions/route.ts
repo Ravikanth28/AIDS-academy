@@ -21,7 +21,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (error) return error
 
   const body = await req.json()
-  const { type = 'coding', difficulty = 'medium', mode = 'both', title, description, examples = [], constraints = '', starterCode = '', hints = [], sampleSolution = '', order = 0 } = body
+  const { type = 'coding', difficulty = 'medium', mode = 'both', title, description, examples = [], constraints = '', starterCode = '', hints = [], sampleSolution = '', sqlSchema = '', expectedOutput = '', order = 0 } = body
 
   if (!title || !description) {
     return NextResponse.json({ error: 'title and description are required' }, { status: 400 })
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!module_) return NextResponse.json({ error: 'Module not found' }, { status: 404 })
 
   const question = await prisma.codingQuestion.create({
-    data: { moduleId: params.id, type, difficulty, mode, title, description, examples: JSON.stringify(examples), constraints, starterCode, hints: JSON.stringify(hints), sampleSolution, order },
+    data: { moduleId: params.id, type, difficulty, mode, title, description, examples: JSON.stringify(examples), constraints, starterCode, hints: JSON.stringify(hints), sampleSolution, sqlSchema: sqlSchema || null, expectedOutput, order },
   })
 
   return NextResponse.json(question)

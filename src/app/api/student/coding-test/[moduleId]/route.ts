@@ -45,6 +45,8 @@ export async function POST(req: NextRequest, { params }: { params: { moduleId: s
       examples: (() => { try { return JSON.parse(q.examples) } catch { return [] } })(),
       constraints: q.constraints || '',
       starterCode: q.starterCode,
+      sqlSchema: q.sqlSchema || '',
+      expectedOutput: q.expectedOutput || '',
       // No hints, no solution in test mode
     }))
     return NextResponse.json({ problems, moduleTitle: module_.title, source: 'admin' })

@@ -12,6 +12,8 @@ interface ProblemSubmission {
   solution: string
   language: string
   examples: Array<{ input: string; output: string }>
+  sqlSchema?: string
+  expectedOutput?: string
 }
 
 // POST: Evaluate coding/SQL submissions with AI and save attempt
@@ -64,6 +66,17 @@ CRITICAL RULES — you MUST follow these:
 6. Never give 0 unless the code is completely blank or prints a hardcoded unrelated answer.`
 
   const problemsList = submissions.map((s, i) => {
+    const isSql = s.type === 'sql'
+    if (isSql) {
+      return `Problem ${i + 1} [${s.difficulty.toUpperCase()}] (SQL) — ${s.title}
+Description: ${s.description}
+Schema:
+${s.sqlSchema || '(no schema provided)'}
+Expected Output (JSON): ${s.expectedOutput || '(not specified)'}
+---
+Student's SQL Query:
+${s.solution || '(no solution submitted)'}`
+    }
     const examplesText = s.examples?.length
       ? s.examples.map((ex, j) => `  Example ${j + 1}: Input: ${ex.input} → Expected Output: ${ex.output}`).join('\n')
       : '  (no examples provided)'

@@ -319,6 +319,8 @@ model CodingQuestion {
   starterCode    String   @db.VarChar(10000) @default("")
   hints          String   @db.VarChar(3000) @default("[]")
   sampleSolution String   @db.LongText
+  sqlSchema      String?  @db.LongText
+  expectedOutput String   @db.VarChar(5000) @default("")
   order         Int      @default(0)
   createdAt     DateTime @default(now())
 
