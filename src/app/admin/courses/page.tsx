@@ -5,9 +5,13 @@ import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   BookOpen, Plus, ChevronRight, Users, PlayCircle, HelpCircle,
-  Eye, EyeOff, Trash2, Search, Zap, AlertTriangle, X,
-  CheckSquare, Square, Layers, TrendingUp, Globe, UserCheck, UserPlus,
+  Eye, EyeOff, Trash2, Search, AlertTriangle, X,
+  CheckSquare, Square, Layers, Globe, UserCheck, Lock,
+  UserPlus, Check, Filter,
 } from 'lucide-react'
+import { Pagination } from '@/components/Pagination'
+
+const COURSES_PER_PAGE = 12
 import toast from 'react-hot-toast'
 
 interface Course {
@@ -16,6 +20,7 @@ interface Course {
   description: string
   category: string
   isPublished: boolean
+  isAssignedOnly: boolean
   thumbnail?: string
   createdAt: string
   modules: Array<{
@@ -25,6 +30,15 @@ interface Course {
     _count: { videos: number; questions: number }
   }>
   _count: { enrollments: number }
+  assignmentCount: number
+  activeEnrollments: number
+}
+
+interface Student {
+  id: string
+  name: string
+  phone: string
+  email?: string
 }
 
 const CATEGORY_PRESETS: Record<string, { gradient: string; bg: string; text: string; icon: string }> = {
@@ -76,14 +90,64 @@ export default function AdminCoursesPage() {
   const [bulkConfirm, setBulkConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
-  // Publish modal state
-  const [publishTarget, setPublishTarget] = useState<Course | null>(null)
-  const [publishMode, setPublishMode] = useState<'everyone' | 'specific'>('everyone')
-  const [students, setStudents] = useState<{ id: string; name: string; phone: string }[]>([])
-  const [studentSearch, setStudentSearch] = useState('')
-  const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set())
-  const [loadingStudents, setLoadingStudents] = useState(false)
   const [publishing, setPublishing] = useState(false)
+  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [page, setPage] = useState(1)
+
+  // Assign modal state
+  const [assignTarget, setAssignTarget] = useState<Course | null>(null)
+  const [assignMode, setAssignMode] = useState<'everyone' | 'individual'>('everyone')
+  const [allStudents, setAllStudents] = useState<Student[]>([])
+  const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set())
+  const [assignLoading, setAssignLoading] = useState(false)
+  const [studentSearch, setStudentSearch] = useState('')
+
+  async function openAssignModal(course: Course) {
+    setAssignTarget(course)
+    setAssignMode(course.isAssignedOnly ? 'individual' : 'everyone')
+    setSelectedStudents(new Set())
+    setStudentSearch('')
+    try {
+      const res = await fetch(`/api/admin/courses/${course.id}/assign`)
+      const data = await res.json()
+      setAllStudents(data.students ?? [])
+      setSelectedStudents(new Set(data.assignedIds ?? []))
+    } catch {
+      toast.error('Failed to load students')
+    }
+  }
+
+  async function handleAssign() {
+    if (!assignTarget) return
+    setAssignLoading(true)
+    try {
+      const body = assignMode === 'everyone'
+        ? { mode: 'everyone' }
+        : { mode: 'individual', studentIds: [...selectedStudents] }
+      const res = await fetch(`/api/admin/courses/${assignTarget.id}/assign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast.success(data.message)
+      setAssignTarget(null)
+      fetchCourses()
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to assign')
+    } finally {
+      setAssignLoading(false)
+    }
+  }
+
+  function toggleStudent(id: string) {
+    setSelectedStudents(prev => {
+      const n = new Set(prev)
+      n.has(id) ? n.delete(id) : n.add(id)
+      return n
+    })
+  }
 
   useEffect(() => { fetchCourses() }, [])
 
@@ -97,75 +161,22 @@ export default function AdminCoursesPage() {
     }
   }
 
-  async function fetchStudents() {
-    setLoadingStudents(true)
-    try {
-      const res = await fetch('/api/admin/students')
-      const data = await res.json()
-      setStudents(data.map((s: { id: string; name: string; phone: string }) => ({ id: s.id, name: s.name, phone: s.phone })))
-    } finally {
-      setLoadingStudents(false)
-    }
-  }
-
-  function openPublishModal(course: Course) {
-    if (course.isPublished) {
-      // Unpublish immediately — no modal needed
-      unpublishCourse(course)
-      return
-    }
-    setPublishTarget(course)
-    setPublishMode('everyone')
-    setSelectedStudents(new Set())
-    setStudentSearch('')
-    if (students.length === 0) fetchStudents()
-  }
-
-  async function unpublishCourse(course: Course) {
+  async function togglePublish(course: Course) {
+    setPublishing(true)
     try {
       const res = await fetch(`/api/admin/courses/${course.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...course, isPublished: false }),
+        body: JSON.stringify({ ...course, isPublished: !course.isPublished, isAssignedOnly: false }),
       })
       if (!res.ok) throw new Error()
-      toast.success('Course unpublished')
+      toast.success(course.isPublished ? 'Course unpublished' : 'Course published')
       fetchCourses()
     } catch {
-      toast.error('Failed to unpublish')
-    }
-  }
-
-  async function handlePublish() {
-    if (!publishTarget) return
-    if (publishMode === 'specific' && selectedStudents.size === 0) {
-      toast.error('Select at least one student')
-      return
-    }
-    setPublishing(true)
-    try {
-      const res = await fetch(`/api/admin/courses/${publishTarget.id}/assign`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mode: publishMode,
-          studentIds: publishMode === 'specific' ? [...selectedStudents] : [],
-        }),
-      })
-      if (!res.ok) throw new Error()
-      const data = await res.json()
-      toast.success(data.message)
-      setPublishTarget(null)
-      fetchCourses()
-    } catch {
-      toast.error('Failed to publish')
+      toast.error('Failed to update')
     } finally {
       setPublishing(false)
     }
-  }
-
-  async function togglePublish(course: Course) {
-    openPublishModal(course)
   }
 
   async function deleteCourse(id: string) {
@@ -212,10 +223,20 @@ export default function AdminCoursesPage() {
     else setSelected(new Set(filtered.map(c => c.id)))
   }
 
+  const categories = Array.from(new Set(courses.map(c => c.category).filter(Boolean))).sort()
+
   const filtered = courses.filter(c =>
-    c.title.toLowerCase().includes(search.toLowerCase()) ||
-    c.category?.toLowerCase().includes(search.toLowerCase())
+    (c.title.toLowerCase().includes(search.toLowerCase()) ||
+    c.category?.toLowerCase().includes(search.toLowerCase())) &&
+    (categoryFilter === 'all' || c.category === categoryFilter)
   )
+
+  // Reset to page 1 on filter/search changes
+  const filteredKey = search + categoryFilter
+  const [prevFilteredKey, setPrevFilteredKey] = useState(filteredKey)
+  if (filteredKey !== prevFilteredKey) { setPrevFilteredKey(filteredKey); if (page !== 1) setPage(1) }
+
+  const paginated = filtered.slice((page - 1) * COURSES_PER_PAGE, page * COURSES_PER_PAGE)
 
   const totalVideos = courses.reduce((a, c) => a + c.modules.reduce((b, m) => b + m._count.videos, 0), 0)
   const totalStudents = courses.reduce((a, c) => a + c._count.enrollments, 0)
@@ -263,9 +284,9 @@ export default function AdminCoursesPage() {
         ))}
       </div>
 
-      {/* Search + Select All */}
-      <div className="flex gap-3 mb-5 items-center">
-        <div className="relative flex-1">
+      {/* Search + Category Filter + Select All */}
+      <div className="flex gap-3 mb-5 items-center flex-wrap">
+        <div className="relative flex-1 min-w-48">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
           <input
             className="input-field pl-10 py-2.5 text-sm w-full"
@@ -274,6 +295,22 @@ export default function AdminCoursesPage() {
             onChange={e => setSearch(e.target.value)}
           />
         </div>
+        {categories.length > 0 && (
+          <div className="relative">
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30 pointer-events-none" />
+            <select
+              value={categoryFilter}
+              onChange={e => setCategoryFilter(e.target.value)}
+              className="bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white/70 focus:outline-none focus:border-purple-500/40 transition-all appearance-none cursor-pointer hover:bg-white/8"
+              style={{ colorScheme: 'dark' }}
+            >
+              <option value="all">All Categories</option>
+              {categories.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+          </div>
+        )}
         {filtered.length > 0 && (
           <button onClick={toggleSelectAll}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-white/60 hover:text-white"
@@ -303,8 +340,9 @@ export default function AdminCoursesPage() {
           )}
         </motion.div>
       ) : (
+        <>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {filtered.map((course, i) => {
+          {paginated.map((course, i) => {
             const cat = getCat(course.category)
             const totalVids = course.modules.reduce((a, m) => a + m._count.videos, 0)
             const totalQs = course.modules.reduce((a, m) => a + m._count.questions, 0)
@@ -352,7 +390,7 @@ export default function AdminCoursesPage() {
                       <span>{cat.icon}</span> {course.category}
                     </span>
                   </div>
-                  <div className="absolute top-2.5 right-3">
+                  <div className="absolute top-2.5 right-3 flex flex-col items-end gap-1">
                     <span className={`px-2.5 py-1 rounded-full text-xs font-bold backdrop-blur-sm border ${
                       course.isPublished
                         ? 'bg-green-500/20 text-green-300 border-green-500/30'
@@ -376,7 +414,11 @@ export default function AdminCoursesPage() {
                       { icon: Layers, val: course.modules.length, label: 'Modules' },
                       { icon: PlayCircle, val: totalVids, label: 'Videos' },
                       { icon: HelpCircle, val: totalQs, label: 'Questions' },
-                      { icon: Users, val: course._count.enrollments, label: 'Students' },
+                      {
+                        icon: course.isAssignedOnly ? UserCheck : Users,
+                        val: course.isAssignedOnly ? course.assignmentCount : course._count.enrollments,
+                        label: course.isAssignedOnly ? 'Assigned' : 'Enrolled',
+                      },
                     ].map(stat => (
                       <div key={stat.label} className="flex flex-col items-center py-1.5 rounded-lg bg-white/3 border border-white/5">
                         <stat.icon className="w-3 h-3 text-white/30 mb-0.5" />
@@ -385,6 +427,16 @@ export default function AdminCoursesPage() {
                       </div>
                     ))}
                   </div>
+
+                  {/* Assignment badge */}
+                  {course.isAssignedOnly && (
+                    <div className="flex items-center gap-1.5 mb-3 px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                      <Lock className="w-3 h-3 text-amber-400 shrink-0" />
+                      <span className="text-amber-300 text-[10px]">
+                        Assigned to {course.assignmentCount} student{course.assignmentCount !== 1 ? 's' : ''} · {course._count.enrollments} enrolled
+                      </span>
+                    </div>
+                  )}
 
                   {/* Module pills */}
                   {course.modules.length > 0 && (
@@ -401,7 +453,7 @@ export default function AdminCoursesPage() {
                   <div className="flex items-center gap-2 pt-2 border-t border-white/5">
                     <button
                       onClick={() => togglePublish(course)}
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      className={`flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs font-medium transition-all ${
                         course.isPublished
                           ? 'bg-white/5 text-white/40 hover:bg-zinc-500/15 hover:text-zinc-300'
                           : 'bg-white/5 text-white/40 hover:bg-green-500/15 hover:text-green-300'
@@ -409,6 +461,17 @@ export default function AdminCoursesPage() {
                     >
                       {course.isPublished ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                       {course.isPublished ? 'Unpublish' : 'Publish'}
+                    </button>
+                    <button
+                      onClick={() => openAssignModal(course)}
+                      className={`flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs font-medium transition-all ${
+                        course.isAssignedOnly
+                          ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25'
+                          : 'bg-white/5 text-white/40 hover:bg-purple-500/15 hover:text-purple-300'
+                      }`}
+                    >
+                      <UserPlus className="w-3 h-3" />
+                      Assign
                     </button>
                     <Link
                       href={`/admin/courses/${course.id}`}
@@ -428,6 +491,13 @@ export default function AdminCoursesPage() {
             )
           })}
         </div>
+        <Pagination
+          page={page}
+          total={filtered.length}
+          perPage={COURSES_PER_PAGE}
+          onChange={setPage}
+        />
+        </>
       )}
 
       {/* Bulk Action Bar */}
@@ -519,173 +589,164 @@ export default function AdminCoursesPage() {
           </motion.div>
         )}
       </AnimatePresence>
-      {/* Publish Modal */}
+
+      {/* Assign Modal */}
       <AnimatePresence>
-        {publishTarget && (
+        {assignTarget && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"
-            onClick={() => setPublishTarget(null)}
+            className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4"
+            onClick={() => setAssignTarget(null)}
           >
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-              className="glass-card gradient-border w-full max-w-lg overflow-hidden"
+            <motion.div initial={{ scale: 0.93, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.93, opacity: 0 }}
+              className="glass-card gradient-border w-full max-w-lg flex flex-col max-h-[85vh]"
               onClick={e => e.stopPropagation()}
             >
-              {/* Header */}
-              <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-white/5">
-                <div>
-                  <h3 className="font-display font-bold text-base">Publish Course</h3>
-                  <p className="text-white/40 text-xs mt-0.5 truncate max-w-72">{publishTarget.title}</p>
+              {/* Modal header */}
+              <div className="flex items-center justify-between p-5 border-b border-white/8 shrink-0">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                    <UserCheck className="w-4 h-4 text-purple-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-display font-bold text-base">Assign Course</h3>
+                    <p className="text-white/40 text-xs truncate max-w-[260px]">{assignTarget.title}</p>
+                  </div>
                 </div>
-                <button onClick={() => setPublishTarget(null)} className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-all">
-                  <X className="w-4 h-4 text-white/50" />
+                <button onClick={() => setAssignTarget(null)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/8 text-white/40 hover:text-white transition-all">
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
-              {/* Mode toggle */}
-              <div className="px-6 pt-4">
-                <p className="text-xs text-white/40 mb-2 uppercase tracking-wider">Who can access this course?</p>
+              {/* Mode selector */}
+              <div className="p-5 border-b border-white/8 shrink-0">
+                <p className="text-xs text-white/50 mb-3 font-medium uppercase tracking-wider">Visibility</p>
                 <div className="grid grid-cols-2 gap-2">
                   <button
-                    onClick={() => setPublishMode('everyone')}
-                    className={`flex flex-col items-center gap-2 p-3 rounded-xl border text-sm font-medium transition-all ${
-                      publishMode === 'everyone'
-                        ? 'border-green-500/50 bg-green-500/10 text-green-300'
-                        : 'border-white/10 bg-white/3 text-white/50 hover:bg-white/8'
+                    onClick={() => setAssignMode('everyone')}
+                    className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all ${
+                      assignMode === 'everyone'
+                        ? 'border-green-500/50 bg-green-500/10'
+                        : 'border-white/8 bg-white/3 hover:bg-white/6'
                     }`}
                   >
-                    <Globe className="w-5 h-5" />
-                    <span>Everyone</span>
-                    <span className="text-[10px] font-normal text-white/30 text-center leading-tight">Publish publicly — students can browse &amp; self-enroll</span>
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                      assignMode === 'everyone' ? 'bg-green-500/20' : 'bg-white/5'
+                    }`}>
+                      <Globe className={`w-4 h-4 ${assignMode === 'everyone' ? 'text-green-400' : 'text-white/30'}`} />
+                    </div>
+                    <div>
+                      <p className={`text-sm font-semibold ${assignMode === 'everyone' ? 'text-green-300' : 'text-white/60'}`}>Everyone</p>
+                      <p className="text-[10px] text-white/30">All students can see this</p>
+                    </div>
+                    {assignMode === 'everyone' && <Check className="w-4 h-4 text-green-400 ml-auto" />}
                   </button>
                   <button
-                    onClick={() => { setPublishMode('specific'); if (students.length === 0) fetchStudents() }}
-                    className={`flex flex-col items-center gap-2 p-3 rounded-xl border text-sm font-medium transition-all ${
-                      publishMode === 'specific'
-                        ? 'border-purple-500/50 bg-purple-500/10 text-purple-300'
-                        : 'border-white/10 bg-white/3 text-white/50 hover:bg-white/8'
+                    onClick={() => setAssignMode('individual')}
+                    className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all ${
+                      assignMode === 'individual'
+                        ? 'border-amber-500/50 bg-amber-500/10'
+                        : 'border-white/8 bg-white/3 hover:bg-white/6'
                     }`}
                   >
-                    <UserCheck className="w-5 h-5" />
-                    <span>Specific Students</span>
-                    <span className="text-[10px] font-normal text-white/30 text-center leading-tight">Auto-enroll selected students only</span>
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                      assignMode === 'individual' ? 'bg-amber-500/20' : 'bg-white/5'
+                    }`}>
+                      <Lock className={`w-4 h-4 ${assignMode === 'individual' ? 'text-amber-400' : 'text-white/30'}`} />
+                    </div>
+                    <div>
+                      <p className={`text-sm font-semibold ${assignMode === 'individual' ? 'text-amber-300' : 'text-white/60'}`}>Individual</p>
+                      <p className="text-[10px] text-white/30">Only selected students</p>
+                    </div>
+                    {assignMode === 'individual' && <Check className="w-4 h-4 text-amber-400 ml-auto" />}
                   </button>
                 </div>
               </div>
 
-              {/* Student selector (visible only in 'specific' mode) */}
-              {publishMode === 'specific' && (
-                <div className="px-6 pt-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs text-white/40 uppercase tracking-wider">Select Students</p>
-                    {selectedStudents.size > 0 && (
-                      <span className="text-xs text-purple-300 font-medium">{selectedStudents.size} selected</span>
-                    )}
-                  </div>
-
-                  {/* Search */}
-                  <div className="relative mb-2">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30" />
-                    <input
-                      className="input-field text-sm py-2 pl-8"
-                      placeholder="Search students..."
-                      value={studentSearch}
-                      onChange={e => setStudentSearch(e.target.value)}
-                    />
-                  </div>
-
-                  {/* Select all / deselect all */}
-                  {!loadingStudents && students.length > 0 && (
-                    <div className="flex gap-2 mb-2">
-                      <button
-                        onClick={() => {
-                          const visible = students.filter(s =>
-                            s.name.toLowerCase().includes(studentSearch.toLowerCase()) ||
-                            s.phone.includes(studentSearch)
-                          )
-                          setSelectedStudents(prev => {
-                            const n = new Set(prev)
-                            visible.forEach(s => n.add(s.id))
-                            return n
-                          })
-                        }}
-                        className="text-xs text-white/40 hover:text-white transition-colors"
-                      >
-                        Select all
-                      </button>
-                      <span className="text-white/20">·</span>
-                      <button onClick={() => setSelectedStudents(new Set())} className="text-xs text-white/40 hover:text-white transition-colors">
-                        Clear
-                      </button>
+              {/* Student selector (only for individual) */}
+              {assignMode === 'individual' && (
+                <div className="flex flex-col min-h-0 flex-1">
+                  <div className="p-4 border-b border-white/8 shrink-0">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs text-white/50 font-medium uppercase tracking-wider">Select Students</p>
+                      <span className="text-xs text-purple-400 font-semibold">{selectedStudents.size} selected</span>
                     </div>
-                  )}
-
-                  {/* Student list */}
-                  <div className="max-h-52 overflow-y-auto rounded-xl border border-white/8 divide-y divide-white/5">
-                    {loadingStudents ? (
-                      <div className="py-6 text-center text-white/30 text-sm">Loading students...</div>
-                    ) : students.length === 0 ? (
-                      <div className="py-6 text-center text-white/30 text-sm">No students found</div>
-                    ) : (
-                      students
-                        .filter(s =>
-                          s.name.toLowerCase().includes(studentSearch.toLowerCase()) ||
-                          s.phone.includes(studentSearch)
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30" />
+                      <input
+                        className="input-field pl-9 py-2 text-sm w-full"
+                        placeholder="Search students..."
+                        value={studentSearch}
+                        onChange={e => setStudentSearch(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="overflow-y-auto flex-1 p-2">
+                    {allStudents
+                      .filter(s =>
+                        s.name.toLowerCase().includes(studentSearch.toLowerCase()) ||
+                        s.phone.includes(studentSearch) ||
+                        (s.email ?? '').toLowerCase().includes(studentSearch.toLowerCase())
+                      )
+                      .map(s => {
+                        const isChosen = selectedStudents.has(s.id)
+                        return (
+                          <button
+                            key={s.id}
+                            onClick={() => toggleStudent(s.id)}
+                            className={`w-full flex items-center gap-3 p-2.5 rounded-xl mb-1 text-left transition-all ${
+                              isChosen
+                                ? 'bg-purple-500/15 border border-purple-500/30'
+                                : 'hover:bg-white/5 border border-transparent'
+                            }`}
+                          >
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                              isChosen ? 'bg-purple-500/30 text-purple-300' : 'bg-white/8 text-white/50'
+                            }`}>
+                              {s.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-sm font-medium truncate ${isChosen ? 'text-white' : 'text-white/70'}`}>{s.name}</p>
+                              <p className="text-[10px] text-white/30 truncate">{s.phone}{s.email ? ` · ${s.email}` : ''}</p>
+                            </div>
+                            {isChosen && <Check className="w-4 h-4 text-purple-400 shrink-0" />}
+                          </button>
                         )
-                        .map(s => {
-                          const checked = selectedStudents.has(s.id)
-                          return (
-                            <button
-                              key={s.id}
-                              onClick={() => setSelectedStudents(prev => {
-                                const n = new Set(prev)
-                                checked ? n.delete(s.id) : n.add(s.id)
-                                return n
-                              })}
-                              className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all ${
-                                checked ? 'bg-purple-500/10' : 'hover:bg-white/4'
-                              }`}
-                            >
-                              <div className={`w-4 h-4 rounded flex-shrink-0 flex items-center justify-center border transition-all ${
-                                checked ? 'bg-purple-500 border-purple-500' : 'border-white/20'
-                              }`}>
-                                {checked && <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 10 8"><path d="M1 4l3 3 5-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                              </div>
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium truncate">{s.name}</p>
-                                <p className="text-xs text-white/30">{s.phone}</p>
-                              </div>
-                            </button>
-                          )
-                        })
+                      })
+                    }
+                    {allStudents.length === 0 && (
+                      <p className="text-center text-white/30 text-sm py-8">No students found</p>
                     )}
                   </div>
                 </div>
               )}
 
-              {/* Footer */}
-              <div className="flex gap-3 px-6 py-4 mt-3">
-                <button onClick={() => setPublishTarget(null)} className="flex-1 btn-secondary py-2.5 text-sm">Cancel</button>
+              {/* Actions */}
+              <div className="p-4 border-t border-white/8 shrink-0 flex gap-3">
+                <button onClick={() => setAssignTarget(null)} className="flex-1 btn-secondary py-2.5 text-sm">
+                  Cancel
+                </button>
                 <button
-                  onClick={handlePublish}
-                  disabled={publishing || (publishMode === 'specific' && selectedStudents.size === 0)}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 ${
-                    publishMode === 'everyone'
-                      ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white'
-                      : 'bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white'
-                  }`}
+                  onClick={handleAssign}
+                  disabled={assignLoading || (assignMode === 'individual' && selectedStudents.size === 0)}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-gradient-to-r from-purple-600 to-cyan-500 text-white hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  {publishing ? (
-                    <><Zap className="w-4 h-4 animate-spin" /> Publishing...</>
-                  ) : publishMode === 'everyone' ? (
-                    <><Globe className="w-4 h-4" /> Publish for Everyone</>
+                  {assignLoading ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Saving...
+                    </>
                   ) : (
-                    <><UserPlus className="w-4 h-4" /> Assign to {selectedStudents.size} Student{selectedStudents.size !== 1 ? 's' : ''}</>
+                    <>
+                      <UserCheck className="w-4 h-4" />
+                      {assignMode === 'everyone' ? 'Assign to Everyone' : `Assign to ${selectedStudents.size} Student${selectedStudents.size !== 1 ? 's' : ''}`}
+                    </>
                   )}
                 </button>
               </div>
             </motion.div>
           </motion.div>
         )}
-      </AnimatePresence>    </div>
+      </AnimatePresence>
+    </div>
   )
 }

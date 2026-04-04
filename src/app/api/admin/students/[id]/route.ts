@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin } from '@/lib/middleware-helpers'
-import { createHash } from 'crypto'
+import bcrypt from 'bcryptjs'
 
-function hashPassword(password: string): string {
-  return createHash('sha256').update(password).digest('hex')
+async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, 10)
 }
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -73,13 +73,13 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json({ error: 'Invalid email format' }, { status: 400 })
     }
-    updateData.email = email?.trim() || null
+    updateData.email = email?.trim() ? email.trim().toLowerCase() : null
   }
   if (password?.trim()) {
-    if (password.length < 4) {
-      return NextResponse.json({ error: 'Password must be at least 4 characters' }, { status: 400 })
+    if (password.length < 6) {
+      return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 })
     }
-    updateData.password = hashPassword(password)
+    updateData.password = await hashPassword(password)
   }
 
   const updated = await prisma.user.update({
@@ -101,6 +101,25 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     return NextResponse.json({ error: 'Student not found' }, { status: 404 })
   }
 
+  // Delete in order to satisfy FK constraints (no onDelete: Cascade on these)
+  // 1. TestAnswers → via TestAttempts
+  const attempts = await prisma.testAttempt.findMany({ where: { userId: params.id }, select: { id: true } })
+  if (attempts.length > 0) {
+    await prisma.testAnswer.deleteMany({ where: { testAttemptId: { in: attempts.map(a => a.id) } } })
+  }
+  await prisma.testAttempt.deleteMany({ where: { userId: params.id } })
+
+  // 2. ModuleProgress → via Enrollments
+  const enrollments = await prisma.enrollment.findMany({ where: { userId: params.id }, select: { id: true } })
+  if (enrollments.length > 0) {
+    await prisma.moduleProgress.deleteMany({ where: { enrollmentId: { in: enrollments.map(e => e.id) } } })
+  }
+  await prisma.enrollment.deleteMany({ where: { userId: params.id } })
+
+  // 3. Certificates
+  await prisma.certificate.deleteMany({ where: { userId: params.id } })
+
+  // 4. Finally delete the user (ActivityLog, MonthlyPoints have Cascade so auto-deleted)
   await prisma.user.delete({ where: { id: params.id } })
   return NextResponse.json({ message: 'Student deleted successfully' })
 }

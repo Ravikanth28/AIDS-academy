@@ -12,26 +12,6 @@ import {
   PieChart, Pie, Cell, Legend,
 } from 'recharts'
 
-interface CourseRaw {
-  id: string
-  title: string
-  category: string
-  modules: unknown[]
-  _count: { enrollments: number }
-}
-
-interface StudentRaw {
-  id: string
-  name: string
-  phone: string
-  createdAt: string
-  enrollments: Array<{
-    course: { id: string; title: string }
-    moduleProgress: Array<{ testPassed: boolean }>
-  }>
-  certificates: unknown[]
-}
-
 interface Stats {
   totalCourses: number
   totalStudents: number
@@ -94,64 +74,19 @@ export default function AdminDashboard() {
 
   async function fetchAll() {
     try {
-      // Fetch core stats (courses + students always succeed)
-      const [coursesRes, studentsRes] = await Promise.all([
-        fetch('/api/admin/courses'),
-        fetch('/api/admin/students'),
-      ])
-      const courses: CourseRaw[] = await coursesRes.json()
-      const students: StudentRaw[] = await studentsRes.json()
-
-      const totalModules = courses.reduce((acc, c) => acc + c.modules.length, 0)
-      const totalCerts = students.reduce((acc, s) => acc + s.certificates.length, 0)
-
-      // Build chart data from already-fetched info
-      const courseEnrollChart = courses
-        .map(c => ({ name: c.title.length > 16 ? c.title.slice(0, 14) + 'â€¦' : c.title, students: c._count.enrollments }))
-        .sort((a, b) => b.students - a.students)
-        .slice(0, 6)
-
-      const catMap = courses.reduce((acc, c) => {
-        acc[c.category] = (acc[c.category] || 0) + 1
-        return acc
-      }, {} as Record<string, number>)
-      const categoryPie = Object.entries(catMap).map(([name, value]) => ({ name, value }))
-
-      setStats({
-        totalCourses: courses.length,
-        totalStudents: students.length,
-        totalCertificates: totalCerts,
-        totalModules,
-        recentStudents: students.slice(0, 5),
-        courseEnrollChart,
-        categoryPie,
-      })
-    } catch (e) {
-      console.error('Stats fetch error:', e)
-    } finally {
+      const res = await fetch('/api/admin/summary')
+      if (!res.ok) return
+      const data = await res.json()
+      setStats(data.stats ?? null)
+      setRecentActivity(data.activity?.logs ?? [])
+      setLeaderboard(
+        (data.leaderboard?.leaderboard ?? [])
+          .map((e: LeaderEntry) => ({ ...e, name: e.user?.name ?? e.name ?? 'Unknown' }))
+          .slice(0, 5),
+      )
+    } catch { /* ignore */ } finally {
       setLoading(false)
     }
-
-    // Fetch activity + leaderboard independently so they don't break the page
-    try {
-      const res = await fetch('/api/admin/activity?limit=8')
-      if (res.ok) {
-        const data = await res.json()
-        setRecentActivity(data.logs ?? [])
-      }
-    } catch { /* silently ignore */ }
-
-    try {
-      const res = await fetch('/api/admin/leaderboard')
-      if (res.ok) {
-        const data = await res.json()
-        setLeaderboard(
-          (data.leaderboard ?? [])
-            .map((e: LeaderEntry) => ({ ...e, name: e.user?.name ?? e.name ?? 'Unknown' }))
-            .slice(0, 5)
-        )
-      }
-    } catch { /* silently ignore */ }
   }
 
   const statCards = stats

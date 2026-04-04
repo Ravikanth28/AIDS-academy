@@ -39,14 +39,13 @@ export default function ProfilePage() {
   useEffect(() => {
     Promise.all([
       fetch('/api/student/profile').then(r => r.json()),
-      fetch('/api/student/certificates').then(r => r.json()),
-      fetch('/api/student/enrollments').then(r => r.json()),
-    ]).then(([data, certs, enrs]) => {
+      fetch('/api/student/dashboard').then(r => r.json()),
+    ]).then(([data, dash]) => {
       if (!data.error) {
         setProfile(data); setName(data.name); setPhone(data.phone); setEmail(data.email || '')
       }
-      setCertCount(Array.isArray(certs) ? certs.length : 0)
-      setEnrollCount(Array.isArray(enrs) ? enrs.length : 0)
+      setCertCount(Array.isArray(dash.certificates) ? dash.certificates.length : 0)
+      setEnrollCount(Array.isArray(dash.enrollments) ? dash.enrollments.length : 0)
       setLoading(false)
     })
   }, [])

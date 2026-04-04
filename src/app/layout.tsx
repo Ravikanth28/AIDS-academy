@@ -1,11 +1,10 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Inter, Space_Grotesk } from 'next/font/google';
 import './globals.css';
 import Providers from '@/components/Providers';
 
-export const dynamic = 'force-dynamic';
-
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-space-grotesk' });
 
 export const metadata: Metadata = {
   title: 'AI·DS Academy – Learn Artificial Intelligence & Data Science',
@@ -16,8 +15,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
-      <body className={`${inter.className} bg-dark text-white antialiased`}>
+    <html lang="en" className="dark" suppressHydrationWarning>
+      <body className={`${inter.variable} ${spaceGrotesk.variable} ${inter.className} bg-dark text-white antialiased`}>
         <Providers>{children}</Providers>
       </body>
     </html>

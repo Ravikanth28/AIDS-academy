@@ -160,6 +160,25 @@ export default function CourseDetailPage() {
         }),
       })
       const data = await res.json()
+
+      // Update state locally — no need to re-fetch all enrollment data
+      setEnrollment(prev => {
+        if (!prev) return prev
+        const existingProgress = prev.moduleProgress.find(p => p.moduleId === selectedModule.id)
+        const updatedVideosWatched = existingProgress
+          ? [...new Set([...(existingProgress.videosWatched || []), videoId])]
+          : [videoId]
+        const newProgress: ModuleProgress = {
+          moduleId: selectedModule.id,
+          videoCompleted: data.videoCompleted ?? (updatedVideosWatched.length >= selectedModule.videos.length),
+          testPassed: existingProgress?.testPassed ?? false,
+          testScore: existingProgress?.testScore ?? null,
+          videosWatched: updatedVideosWatched,
+        }
+        const filtered = prev.moduleProgress.filter(p => p.moduleId !== selectedModule.id)
+        return { ...prev, moduleProgress: [...filtered, newProgress] }
+      })
+
       if (data.videoCompleted) {
         toast.success('🎉 All videos watched! You can now take the test.')
       } else {
@@ -169,7 +188,6 @@ export default function CourseDetailPage() {
           setSelectedVideo(nextVideo)
         }
       }
-      await fetchEnrollment()
     } catch {
       // silent
     }

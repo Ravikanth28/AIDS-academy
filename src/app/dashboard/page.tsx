@@ -76,12 +76,11 @@ export default function DashboardPage() {
   useEffect(() => {
     Promise.all([
       fetch('/api/auth/me').then(r => r.json()),
-      fetch('/api/student/enrollments').then(r => r.json()),
-      fetch('/api/student/certificates').then(r => r.json()),
-    ]).then(([me, enr, certs]) => {
+      fetch('/api/student/dashboard').then(r => r.json()),
+    ]).then(([me, dash]) => {
       setUser(me)
-      setEnrollments(Array.isArray(enr) ? enr : [])
-      setCertificates(Array.isArray(certs) ? certs : [])
+      setEnrollments(Array.isArray(dash.enrollments) ? dash.enrollments : [])
+      setCertificates(Array.isArray(dash.certificates) ? dash.certificates : [])
       setLoading(false)
     })
   }, [])

@@ -7,14 +7,38 @@ export async function GET(req: NextRequest) {
   const { session, error } = await requireAdmin(req)
   if (error) return error
 
-  const courses = await prisma.course.findMany({
-    include: {
-      modules: { orderBy: { order: 'asc' }, include: { _count: { select: { videos: true, questions: true } } } },
-      _count: { select: { enrollments: true } },
-    },
-    orderBy: { createdAt: 'desc' },
-  })
-  return NextResponse.json(courses)
+  const [courses, activeCounts, assignmentCounts] = await Promise.all([
+    prisma.course.findMany({
+      include: {
+        modules: { orderBy: { order: 'asc' }, include: { _count: { select: { videos: true, questions: true } } } },
+        _count: { select: { enrollments: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+    // Count enrollments where the student has actually started (videoCompleted or testPassed)
+    prisma.enrollment.groupBy({
+      by: ['courseId'],
+      where: {
+        moduleProgress: { some: { OR: [{ videoCompleted: true }, { testPassed: true }] } },
+      },
+      _count: { id: true },
+    }),
+    // Count individual assignments per course
+    prisma.courseAssignment.groupBy({
+      by: ['courseId'],
+      _count: { id: true },
+    }),
+  ])
+
+  const activeMap = Object.fromEntries(activeCounts.map(r => [r.courseId, r._count.id]))
+  const assignMap = Object.fromEntries(assignmentCounts.map(r => [r.courseId, r._count.id]))
+
+  const result = courses.map(c => ({
+    ...c,
+    activeEnrollments: activeMap[c.id] ?? 0,
+    assignmentCount: assignMap[c.id] ?? 0,
+  }))
+  return NextResponse.json(result)
 }
 
 // POST create course

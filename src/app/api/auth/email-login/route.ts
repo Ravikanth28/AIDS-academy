@@ -12,7 +12,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Email and password are required' }, { status: 400 })
     }
 
-    const user = await prisma.user.findFirst({ where: { email: email.trim().toLowerCase() } })
+    const user = await prisma.user.findFirst({
+      where: { email: { equals: email.trim(), mode: 'insensitive' } },
+    })
     if (!user || !user.password) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
     }
@@ -27,6 +29,7 @@ export async function POST(req: NextRequest) {
       phone: user.phone,
       role: user.role,
       name: user.name,
+      email: user.email ?? null,
     })
 
     await logLoginActivity(user.id).catch(() => {})

@@ -33,6 +33,25 @@ export async function GET(req: NextRequest, { params }: { params: { moduleId: st
     return NextResponse.json({ error: 'Complete all videos before taking the test' }, { status: 403 })
   }
 
+  // Enforce sequential unlock: previous module must be passed first
+  const courseModules = await prisma.module.findMany({
+    where: { courseId: enrollment.courseId },
+    select: { id: true, order: true },
+    orderBy: { order: 'asc' },
+  })
+  const currentModule = courseModules.find((m) => m.id === params.moduleId)
+  if (currentModule && currentModule.order > 1) {
+    const prevModule = courseModules.find((m) => m.order === currentModule.order - 1)
+    if (prevModule) {
+      const prevProgress = await prisma.moduleProgress.findUnique({
+        where: { enrollmentId_moduleId: { enrollmentId: enrollment.id, moduleId: prevModule.id } },
+      })
+      if (!prevProgress?.testPassed) {
+        return NextResponse.json({ error: 'Complete the previous module before accessing this test' }, { status: 403 })
+      }
+    }
+  }
+
   // Check if module has any test questions
   if (module_.questions.length === 0) {
     return NextResponse.json({ error: 'No test questions available for this module yet. Please check back later.' }, { status: 404 })

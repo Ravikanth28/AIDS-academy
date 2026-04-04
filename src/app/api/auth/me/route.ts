@@ -8,15 +8,15 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Fetch fresh data from DB (includes email)
+  // Always fetch fresh data from DB so role/name/email changes are reflected immediately
   const user = await prisma.user.findUnique({
     where: { id: session.userId },
     select: { id: true, name: true, phone: true, email: true, role: true },
   })
-
   if (!user) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 })
   }
 
   return NextResponse.json(user)
 }
+

@@ -52,16 +52,18 @@ export async function POST(req: NextRequest, { params }: { params: { moduleId: s
   }
 
   // Gather transcripts for MCQ generation
-  const transcripts: string[] = []
-  for (const video of module_.videos) {
-    try {
-      const segments = await getTranscript(video.youtubeUrl)
-      const text = transcriptToText(segments)
-      if (text) transcripts.push(`Video: ${video.title}\n${text}`)
-    } catch {
-      // skip videos without transcripts
-    }
-  }
+  const transcriptResults = await Promise.all(
+    module_.videos.map(async (video) => {
+      try {
+        const segments = await getTranscript(video.youtubeUrl)
+        const text = transcriptToText(segments)
+        return text ? `Video: ${video.title}\n${text}` : null
+      } catch {
+        return null
+      }
+    }),
+  )
+  const transcripts = transcriptResults.filter((t): t is string => t !== null)
 
   const body = await req.json().catch(() => ({}))
   const mcqCount = Math.min(Math.max(body.mcqCount || 4, 3), 5)

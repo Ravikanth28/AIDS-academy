@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/middleware-helpers'
 import { getTranscript, transcriptToText } from '@/lib/youtube'
 import { chatCompletion } from '@/lib/ai'
+import { getCached, setCached } from '@/lib/cache'
 
 // POST: AI finds relevant learning resources for a module
 export async function POST(req: NextRequest, { params }: { params: { moduleId: string } }) {
@@ -19,22 +20,26 @@ export async function POST(req: NextRequest, { params }: { params: { moduleId: s
     })
     if (!module_) return NextResponse.json({ error: 'Module not found' }, { status: 404 })
 
-    // Try to get transcript context for better recommendations
-    let topicContext = ''
-    let transcriptCount = 0
+    // Return cached result if available (1 hour TTL)
+    const cacheKey = `resources:${params.moduleId}`
+    const cached = getCached(cacheKey)
+    if (cached) return NextResponse.json(JSON.parse(cached))
 
-    for (const video of module_.videos.slice(0, 2)) {
-      try {
-        const segments = await getTranscript(video.youtubeUrl)
-        const text = transcriptToText(segments)
-        if (text) {
-          topicContext += `\nVideo "${video.title}" covers: ${text.slice(0, 500)}`
-          transcriptCount++
+    // Try to get transcript context for better recommendations — fetch in parallel
+    const transcriptResults = await Promise.all(
+      module_.videos.slice(0, 2).map(async (video) => {
+        try {
+          const segments = await getTranscript(video.youtubeUrl)
+          const text = transcriptToText(segments)
+          return text ? `\nVideo "${video.title}" covers: ${text.slice(0, 500)}` : null
+        } catch {
+          return null
         }
-      } catch {
-        // skip silently
-      }
-    }
+      })
+    )
+    const validTranscripts = transcriptResults.filter((t): t is string => t !== null)
+    const topicContext = validTranscripts.join('')
+    const transcriptCount = validTranscripts.length
 
     if (transcriptCount === 0) {
       return NextResponse.json({
@@ -81,11 +86,26 @@ ${topicContext}`
     }
 
     const data = JSON.parse(jsonMatch[0])
-    return NextResponse.json({
-      resources: data.resources || [],
+
+    // Validate URLs: keep only entries where URL starts with https:// and looks well-formed
+    const validatedResources = (data.resources ?? []).filter((r: { url?: string }) => {
+      if (!r.url || typeof r.url !== 'string') return false
+      try {
+        const url = new URL(r.url)
+        return url.protocol === 'https:'
+      } catch {
+        return false
+      }
+    })
+
+    const result = {
+      resources: validatedResources,
       moduleTitle: module_.title,
       courseTitle: module_.course.title,
-    })
+      disclaimer: 'These resources are AI-suggested. Links are filtered for HTTPS but not individually verified — some may be unavailable.',
+    }
+    setCached(cacheKey, JSON.stringify(result))
+    return NextResponse.json(result)
   } catch (err) {
     console.error('Resource finder error:', err)
     return NextResponse.json({ error: 'Failed to find resources' }, { status: 500 })

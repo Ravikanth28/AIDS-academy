@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -25,6 +26,8 @@ model User {
   monthlyPoints    MonthlyPoints[]
   practiceAttempts PracticeAttempt[]
   codingAttempts   CodingAttempt[]
+  codingDrafts     CodingDraft[]
+  courseAssignments CourseAssignment[]
 }
 
 model ActivityLog {
@@ -79,13 +82,28 @@ model Course {
   description String
   thumbnail   String?
   category    String?  @default("AI & Data Science")
-  isPublished Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  isPublished    Boolean  @default(false)
+  isAssignedOnly Boolean  @default(false)
+  createdAt      DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   modules      Module[]
   enrollments  Enrollment[]
   certificates Certificate[]
+  assignments  CourseAssignment[]
+}
+
+model CourseAssignment {
+  id        String   @id @default(cuid())
+  courseId  String
+  userId    String
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([courseId, userId])
+  @@index([courseId])
+  @@index([userId])
 }
 
 model Module {
@@ -106,6 +124,9 @@ model Module {
   practiceAttempts PracticeAttempt[]
   codingAttempts   CodingAttempt[]
   codingQuestions  CodingQuestion[]
+  codingDrafts     CodingDraft[]
+
+  @@index([courseId])
 }
 
 model Video {
@@ -119,6 +140,8 @@ model Video {
   createdAt   DateTime @default(now())
 
   checkpointQuestions Question[]
+
+  @@index([moduleId])
 }
 
 model Question {
@@ -134,6 +157,9 @@ model Question {
 
   options     QuestionOption[]
   testAnswers TestAnswer[]
+
+  @@index([moduleId])
+  @@index([videoId])
 }
 
 model QuestionOption {
@@ -143,19 +169,22 @@ model QuestionOption {
   order      Int      @default(0)
   questionId String
   question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
 }
 
 model Enrollment {
   id         String   @id @default(cuid())
   userId     String
   courseId   String
-  user       User     @relation(fields: [userId], references: [id])
-  course     Course   @relation(fields: [courseId], references: [id])
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   enrolledAt DateTime @default(now())
 
   moduleProgress ModuleProgress[]
 
   @@unique([userId, courseId])
+  @@index([courseId])
 }
 
 model ModuleProgress {
@@ -171,6 +200,7 @@ model ModuleProgress {
   completedAt    DateTime?
 
   @@unique([enrollmentId, moduleId])
+  @@index([moduleId])
 }
 
 model TestAttempt {
@@ -186,6 +216,9 @@ model TestAttempt {
   createdAt      DateTime @default(now())
 
   answers TestAnswer[]
+
+  @@index([userId])
+  @@index([moduleId])
 }
 
 model TestAnswer {
@@ -195,7 +228,10 @@ model TestAnswer {
   selectedOptionId String?
   isCorrect        Boolean
   testAttempt      TestAttempt @relation(fields: [testAttemptId], references: [id], onDelete: Cascade)
-  question         Question    @relation(fields: [questionId], references: [id])
+  question         Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([testAttemptId])
+  @@index([questionId])
 }
 
 enum CertificateStatus {
@@ -208,7 +244,7 @@ model Certificate {
   id            String            @id @default(cuid())
   userId        String
   courseId      String
-  certificateNo String            @unique @default(cuid())
+  certificateNo String            @unique
   status        CertificateStatus @default(PENDING)
   revokedReason String?
   user          User              @relation(fields: [userId], references: [id])
@@ -216,6 +252,7 @@ model Certificate {
   issuedAt      DateTime          @default(now())
 
   @@unique([userId, courseId])
+  @@index([courseId])
 }
 
 model PracticeAttempt {
@@ -248,6 +285,22 @@ model CodingAttempt {
   feedback      String?
   completedAt   DateTime @default(now())
 
+  @@index([userId])
+  @@index([moduleId])
+}
+
+model CodingDraft {
+  id        String   @id @default(cuid())
+  userId    String
+  moduleId  String
+  solutions String   @default("{}")  // JSON: Record<problemId, code>
+  languages String   @default("{}")  // JSON: Record<problemId, lang>
+  updatedAt DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, moduleId])
   @@index([userId])
   @@index([moduleId])
 }

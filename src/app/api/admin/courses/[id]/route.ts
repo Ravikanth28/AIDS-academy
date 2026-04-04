@@ -35,6 +35,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       category: body.category,
       thumbnail: body.thumbnail,
       isPublished: body.isPublished,
+      // Reset isAssignedOnly when unpublishing so re-publish starts fresh
+      ...(body.isPublished === false ? { isAssignedOnly: false } : {}),
     },
   })
   return NextResponse.json(course)

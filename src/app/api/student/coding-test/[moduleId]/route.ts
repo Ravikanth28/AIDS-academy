@@ -86,7 +86,7 @@ Return ONLY valid JSON matching this exact schema:
         {"input": "...", "output": "..."}
       ],
       "constraints": "time/space complexity expectations or SQL constraints",
-      "starterCode": "function/query skeleton for candidate to fill in"
+      "starterCode": "starter code for the student"
     }
   ]
 }
@@ -94,7 +94,13 @@ Rules:
 - First problem: easy, second: medium, third: hard (difficulty progression)
 - Problems must be directly relevant to the module transcript topic
 - Type: use "coding" for Python/JavaScript problems, "sql" for database problems
-- No hints — this is a test`
+- No hints — this is a test
+- For Python coding problems: starterCode MUST use input() to read values from stdin, NOT function parameters. Example starter:
+  # Read inputs
+  n = int(input("Enter n: "))
+  # Write your solution here
+- For examples: show logical values (e.g. Input: "5 3", Output: "8") so the student knows what to expect
+- Do NOT generate function-based starters for Python — use procedural input() style`
 
   const userPrompt = `Generate ${count} coding/SQL test problems for module: "${module_.title}"\n\n${trimmed}`
 
