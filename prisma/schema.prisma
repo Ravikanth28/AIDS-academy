@@ -3,9 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "mysql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -34,8 +33,8 @@ model ActivityLog {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  action    String   // "LOGIN", "LOGOUT", "VIDEO_WATCHED", "TEST_PASSED", "CERTIFICATE_EARNED", "ENROLLED"
-  detail    String?
+  action    String
+  detail    String?  @db.Text
   points    Int      @default(0)
   createdAt DateTime @default(now())
 
@@ -79,8 +78,8 @@ model OTPSession {
 model Course {
   id          String   @id @default(cuid())
   title       String
-  description String
-  thumbnail   String?
+  description String   @db.Text
+  thumbnail   String?  @db.Text
   category    String?  @default("AI & Data Science")
   isPublished    Boolean  @default(false)
   isAssignedOnly Boolean  @default(false)
@@ -109,7 +108,7 @@ model CourseAssignment {
 model Module {
   id            String   @id @default(cuid())
   title         String
-  description   String?
+  description   String?  @db.Text
   order         Int
   courseId      String
   course        Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
@@ -133,7 +132,7 @@ model Video {
   id          String   @id @default(cuid())
   title       String
   youtubeUrl  String
-  description String?
+  description String?  @db.Text
   order       Int      @default(0)
   moduleId    String
   module      Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
@@ -146,10 +145,10 @@ model Video {
 
 model Question {
   id          String   @id @default(cuid())
-  text        String
+  text        String   @db.Text
   moduleId    String
   module      Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  explanation String?
+  explanation String?  @db.Text
   videoId     String?
   video       Video?   @relation(fields: [videoId], references: [id], onDelete: SetNull)
   timestamp   Int?     // seconds into the video for checkpoint questions
@@ -164,7 +163,7 @@ model Question {
 
 model QuestionOption {
   id         String   @id @default(cuid())
-  text       String
+  text       String   @db.Text
   isCorrect  Boolean  @default(false)
   order      Int      @default(0)
   questionId String
@@ -193,7 +192,8 @@ model ModuleProgress {
   moduleId       String
   enrollment     Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
   module         Module     @relation(fields: [moduleId], references: [id])
-  videosWatched  String[]   @default([])
+  // Stored as JSON string — auto-parsed to string[] by Prisma extension in lib/prisma.ts
+  videosWatched  String    @default("[]") @db.VarChar(4000)
   videoCompleted Boolean    @default(false)
   testPassed     Boolean    @default(false)
   testScore      Float?
@@ -246,7 +246,7 @@ model Certificate {
   courseId      String
   certificateNo String            @unique
   status        CertificateStatus @default(PENDING)
-  revokedReason String?
+  revokedReason String?           @db.Text
   user          User              @relation(fields: [userId], references: [id])
   course        Course            @relation(fields: [courseId], references: [id])
   issuedAt      DateTime          @default(now())
@@ -282,7 +282,7 @@ model CodingAttempt {
   score         Float    @default(0)
   totalProblems Int      @default(0)
   passed        Boolean  @default(false)
-  feedback      String?
+  feedback      String?  @db.Text
   completedAt   DateTime @default(now())
 
   @@index([userId])
@@ -293,8 +293,8 @@ model CodingDraft {
   id        String   @id @default(cuid())
   userId    String
   moduleId  String
-  solutions String   @default("{}")  // JSON: Record<problemId, code>
-  languages String   @default("{}")  // JSON: Record<problemId, lang>
+  solutions String   @db.LongText
+  languages String   @db.VarChar(2000) @default("{}")
   updatedAt DateTime @updatedAt
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -312,13 +312,13 @@ model CodingQuestion {
   type          String   @default("coding")       // "coding" | "sql"
   difficulty    String   @default("medium")       // "easy" | "medium" | "hard"
   mode          String   @default("both")         // "practice" | "test" | "both"
-  title         String
-  description   String
-  examples      String   @default("[]")           // JSON: [{input, output}]
-  constraints   String?
-  starterCode   String   @default("")
-  hints         String   @default("[]")           // JSON: string[]
-  sampleSolution String  @default("")
+  title          String
+  description    String   @db.Text
+  examples       String   @db.VarChar(5000) @default("[]")
+  constraints    String?  @db.Text
+  starterCode    String   @db.VarChar(10000) @default("")
+  hints          String   @db.VarChar(3000) @default("[]")
+  sampleSolution String   @db.LongText
   order         Int      @default(0)
   createdAt     DateTime @default(now())
 
