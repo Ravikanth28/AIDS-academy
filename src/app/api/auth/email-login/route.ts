@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     }
 
     const user = await prisma.user.findFirst({
-      where: { email: { equals: email.trim(), mode: 'insensitive' } },
+      where: { email: email.trim().toLowerCase() },
     })
     if (!user || !user.password) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })

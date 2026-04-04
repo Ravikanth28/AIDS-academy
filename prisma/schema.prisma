@@ -79,7 +79,7 @@ model Course {
   id          String   @id @default(cuid())
   title       String
   description String   @db.Text
-  thumbnail   String?  @db.Text
+  thumbnail   String?  @db.LongText
   category    String?  @default("AI & Data Science")
   isPublished    Boolean  @default(false)
   isAssignedOnly Boolean  @default(false)
