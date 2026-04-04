@@ -93,27 +93,26 @@ export async function POST(req: NextRequest, { params }: { params: { moduleId: s
     // Only award points if this is the FIRST time passing this module
     const alreadyPassed = existing?.testPassed === true
 
-    // Update/create moduleProgress and fetch all progress in parallel
-    const [, allProgress] = await Promise.all([
-      existing
-        ? prisma.moduleProgress.update({
-            where: { enrollmentId_moduleId: { enrollmentId: enrollment.id, moduleId: params.moduleId } },
-            data: { testPassed: true, testScore: score, completedAt: new Date() },
-          })
-        : prisma.moduleProgress.create({
-            data: {
-              enrollmentId: enrollment.id,
-              moduleId: params.moduleId,
-              testPassed: true,
-              testScore: score,
-              videoCompleted: true,
-              completedAt: new Date(),
-            },
-          }),
-      prisma.moduleProgress.findMany({
-        where: { enrollmentId: enrollment.id },
-      }),
-    ])
+    // Update/create moduleProgress first, then fetch all progress
+    await (existing
+      ? prisma.moduleProgress.update({
+          where: { enrollmentId_moduleId: { enrollmentId: enrollment.id, moduleId: params.moduleId } },
+          data: { testPassed: true, testScore: score, videoCompleted: true, completedAt: new Date() },
+        })
+      : prisma.moduleProgress.create({
+          data: {
+            enrollmentId: enrollment.id,
+            moduleId: params.moduleId,
+            testPassed: true,
+            testScore: score,
+            videoCompleted: true,
+            completedAt: new Date(),
+          },
+        }))
+
+    const allProgress = await prisma.moduleProgress.findMany({
+      where: { enrollmentId: enrollment.id },
+    })
 
     if (!alreadyPassed) {
       logActivity(session!.userId, 'TEST_PASSED', `Passed test for module in course`, POINTS.TEST_PASSED).catch(() => {})
@@ -140,7 +139,7 @@ export async function POST(req: NextRequest, { params }: { params: { moduleId: s
             userId: session!.userId,
             courseId,
             certificateNo,
-            status: 'VERIFIED',
+            status: 'PENDING',
           },
         })
         certificateEarned = true
