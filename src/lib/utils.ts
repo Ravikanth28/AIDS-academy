@@ -24,6 +24,20 @@ export function getYouTubeThumbnail(url: string): string {
   return `https://img.youtube.com/vi/${id}/hqdefault.jpg`
 }
 
+/**
+ * Returns the best thumbnail URL for a course.
+ * - If thumbnail is a YouTube URL → return YouTube CDN thumbnail
+ * - If thumbnail is a base64 data URL → return as-is (legacy)
+ * - Otherwise → return null (caller shows gradient fallback)
+ */
+export function getCourseThumbnailUrl(thumbnail: string | null | undefined): string | null {
+  if (!thumbnail) return null
+  if (thumbnail.startsWith('data:')) return thumbnail          // legacy base64
+  const id = getYouTubeVideoId(thumbnail)
+  if (id) return `https://img.youtube.com/vi/${id}/hqdefault.jpg`
+  return null
+}
+
 export function getYouTubeEmbedUrl(url: string): string {
   const id = getYouTubeVideoId(url)
   if (!id) return ''

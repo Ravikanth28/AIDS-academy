@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Loader2, Trophy, Calendar, Hash, Eye, Download, CheckCircle, Clock, XCircle, Linkedin } from 'lucide-react'
 import CertificateCard from '@/components/student/CertificateCard'
+import { getCourseThumbnailUrl } from '@/lib/utils'
 
 interface Certificate {
   id: string
@@ -141,8 +142,8 @@ export default function CertificatesPage() {
 
                   {/* Thumbnail / banner */}
                   <div className="relative h-36 overflow-hidden">
-                    {cert.course.thumbnail ? (
-                      <img src={cert.course.thumbnail} alt={cert.course.title} className="w-full h-full object-cover" />
+                    {getCourseThumbnailUrl(cert.course.thumbnail) ? (
+                      <img src={getCourseThumbnailUrl(cert.course.thumbnail)!} alt={cert.course.title} className="w-full h-full object-cover" />
                     ) : (
                       <div className={`w-full h-full bg-gradient-to-br ${cat.gradient} opacity-20`} />
                     )}

@@ -9,6 +9,7 @@ import {
   CheckSquare, Square, Layers, Globe, UserCheck, Lock,
   UserPlus, Check, Filter,
 } from 'lucide-react'
+import { getCourseThumbnailUrl } from '@/lib/utils'
 import { Pagination } from '@/components/Pagination'
 
 const COURSES_PER_PAGE = 12
@@ -377,8 +378,8 @@ export default function AdminCoursesPage() {
 
                 {/* Thumbnail / Gradient fallback */}
                 <div className="relative h-36 overflow-hidden">
-                  {course.thumbnail ? (
-                    <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover" />
+                  {getCourseThumbnailUrl(course.thumbnail) ? (
+                    <img src={getCourseThumbnailUrl(course.thumbnail)!} alt={course.title} className="w-full h-full object-cover" />
                   ) : (
                     <div className={`w-full h-full bg-gradient-to-br ${cat.gradient} opacity-20`} />
                   )}
