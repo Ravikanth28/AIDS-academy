@@ -119,7 +119,7 @@ export async function POST(req: NextRequest, { params }: { params: { moduleId: s
     }
 
     const allPassed = allCourseModules.every((m) =>
-      allProgress.some((p) => p.moduleId === m.id && p.testPassed && p.videoCompleted),
+      allProgress.some((p) => p.moduleId === m.id && p.testPassed),
     )
 
     if (allPassed) {

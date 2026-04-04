@@ -8,7 +8,8 @@ export const runtime = 'nodejs'
 let sqlEngine: Awaited<ReturnType<typeof loadSqlJs>> | null = null
 
 async function loadSqlJs() {
-  const initSqlJs = (await import('sql.js')).default
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const initSqlJs = ((await import('sql.js')) as any).default
   return initSqlJs({
     locateFile: (file: string) =>
       path.join(process.cwd(), 'node_modules', 'sql.js', 'dist', file),
@@ -73,9 +74,9 @@ export async function POST(req: NextRequest) {
     }
 
     const { columns, values } = results[0]
-    const rows: Record<string, unknown>[] = values.map(row => {
+    const rows: Record<string, unknown>[] = (values as unknown[][]).map((row: unknown[]) => {
       const obj: Record<string, unknown> = {}
-      columns.forEach((col, i) => { obj[col] = row[i] })
+      ;(columns as string[]).forEach((col: string, i: number) => { obj[col] = row[i] })
       return obj
     })
 
