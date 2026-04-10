@@ -81,10 +81,11 @@ model Course {
   description String   @db.Text
   thumbnail   String?  @db.LongText
   category    String?  @default("AI & Data Science")
-  isPublished    Boolean  @default(false)
-  isAssignedOnly Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isPublished       Boolean  @default(false)
+  isAssignedOnly    Boolean  @default(false)
+  allowVideoControls Boolean @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   modules      Module[]
   enrollments  Enrollment[]
@@ -133,10 +134,11 @@ model Video {
   title       String
   youtubeUrl  String
   description String?  @db.Text
-  order       Int      @default(0)
-  moduleId    String
-  module      Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
+  order           Int      @default(0)
+  durationSeconds Int      @default(0)
+  moduleId        String
+  module          Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
 
   checkpointQuestions Question[]
 
@@ -193,11 +195,12 @@ model ModuleProgress {
   enrollment     Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
   module         Module     @relation(fields: [moduleId], references: [id])
   // Stored as JSON string — auto-parsed to string[] by Prisma extension in lib/prisma.ts
-  videosWatched  String    @default("[]") @db.VarChar(4000)
-  videoCompleted Boolean    @default(false)
-  testPassed     Boolean    @default(false)
-  testScore      Float?
-  completedAt    DateTime?
+  videosWatched     String    @default("[]") @db.VarChar(4000)
+  videoCompleted    Boolean   @default(false)
+  testPassed        Boolean   @default(false)
+  testScore         Float?
+  completedAt       DateTime?
+  timeSpentSeconds  Int       @default(0)
 
   @@unique([enrollmentId, moduleId])
   @@index([moduleId])
@@ -209,11 +212,12 @@ model TestAttempt {
   moduleId       String
   user           User     @relation(fields: [userId], references: [id])
   module         Module   @relation(fields: [moduleId], references: [id])
-  score          Float
-  totalQuestions Int
-  correctAnswers Int
-  passed         Boolean
-  createdAt      DateTime @default(now())
+  score            Float
+  totalQuestions   Int
+  correctAnswers   Int
+  passed           Boolean
+  timeSpentSeconds Int      @default(0)
+  createdAt        DateTime @default(now())
 
   answers TestAnswer[]
 
@@ -318,9 +322,12 @@ model CodingQuestion {
   constraints    String?  @db.Text
   starterCode    String   @db.VarChar(10000) @default("")
   hints          String   @db.VarChar(3000) @default("[]")
-  sampleSolution String   @db.LongText
-  order         Int      @default(0)
-  createdAt     DateTime @default(now())
+  sampleSolution  String   @db.LongText
+  expectedOutput  String?  @db.Text
+  sqlSchema       String?  @db.LongText
+  hiddenTestCases String?  @db.LongText
+  order           Int      @default(0)
+  createdAt       DateTime @default(now())
 
   @@index([moduleId])
 }
